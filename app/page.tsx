@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import Link from 'next/link'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useRouter, useSearchParams } from 'next/navigation'
 import DropZone from './components/DropZone'
 import UploadModal from './components/UploadModal'
 
@@ -25,7 +26,59 @@ function HomeContent() {
   const [petImages, setPetImages] = useState<PetImage[]>([])
   const [error, setError] = useState<string | null>(null)
   const [selectedImage, setSelectedImage] = useState<PetImage | null>(null)
+  const [isProcessingAuth, setIsProcessingAuth] = useState(false)
   const supabase = createClientComponentClient()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Handle OAuth code if present in URL
+  useEffect(() => {
+    const code = searchParams.get('code')
+    if (code) {
+      console.log(`OAuth code detected: ${code.substring(0, 8)}...`)
+      handleOAuthCode(code)
+    }
+  }, [searchParams])
+
+  const handleOAuthCode = async (code: string) => {
+    try {
+      setIsProcessingAuth(true)
+      console.log('Processing OAuth code...')
+      
+      // Exchange code for session
+      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+      
+      if (exchangeError) {
+        console.error('Error exchanging code for session:', exchangeError)
+        setError('Authentication error. Please try again.')
+        return
+      }
+      
+      console.log('Code successfully exchanged for session')
+      
+      // Check if session was created
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError) {
+        console.error('Error getting session:', sessionError)
+        setError('Session error. Please try again.')
+        return
+      }
+      
+      if (session) {
+        console.log('Session found, redirecting to admin dashboard')
+        router.push('/admin')
+      } else {
+        console.log('No session created after code exchange')
+        setError('Authentication failed. Please try again.')
+      }
+    } catch (err) {
+      console.error('Error handling OAuth code:', err)
+      setError('Unexpected error during authentication. Please try again.')
+    } finally {
+      setIsProcessingAuth(false)
+    }
+  }
 
   const getSignedUrl = async (filePath: string) => {
     try {
@@ -76,8 +129,10 @@ function HomeContent() {
       }
     }
 
-    fetchImages()
-  }, [])
+    if (!isProcessingAuth) {
+      fetchImages()
+    }
+  }, [isProcessingAuth])
 
   const handleFileDrop = (acceptedFiles: File[]) => {
     setUploadedFiles(acceptedFiles)
@@ -117,6 +172,17 @@ function HomeContent() {
       })
   }
 
+  // If processing auth, show loading state
+  if (isProcessingAuth) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+        <h2 className="text-xl font-semibold mb-2">Processing Authentication</h2>
+        <p className="text-gray-600">Please wait while we log you in...</p>
+      </div>
+    )
+  }
+
   return (
     <main className="container mx-auto px-4 py-8">
       <h1 className="text-4xl font-bold text-center mb-8">Pet Rank</h1>
@@ -126,6 +192,12 @@ function HomeContent() {
           Admin Login
         </Link>
       </div>
+
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-8">
+          <p className="text-red-700">{error}</p>
+        </div>
+      )}
 
       {petImages.length > 0 && petImages[0] && (
         <div className="mb-8">
@@ -175,10 +247,6 @@ function HomeContent() {
       <div className="mb-8 max-w-xl mx-auto">
         <DropZone onDrop={handleFileDrop} />
       </div>
-
-      {error && (
-        <p className="text-red-500 text-center mb-4">{error}</p>
-      )}
 
       {petImages.length > 1 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
