@@ -38,7 +38,7 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/admin/:path*',
-    '/',  // Add root path to handle GitHub callback
+    '/?code=:code*',  // Only match root path when there's a code parameter
     '/auth/callback'
   ]
 } 
