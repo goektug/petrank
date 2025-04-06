@@ -70,7 +70,7 @@ function AuthContent() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo: `${window.location.origin}/admin`,
+          redirectTo: `${window.location.origin}/handle-auth`,
           skipBrowserRedirect: false // Ensure browser is redirected
         }
       })
@@ -96,7 +96,7 @@ function AuthContent() {
   const handleDirectLogin = () => {
     log('Using direct OAuth URL...')
     const supabaseUrl = 'https://cblsslcreohsrhnurfev.supabase.co'
-    const redirectTo = encodeURIComponent(`${window.location.origin}/admin`)
+    const redirectTo = encodeURIComponent(`${window.location.origin}/handle-auth`)
     const directUrl = `${supabaseUrl}/auth/v1/authorize?provider=github&redirect_to=${redirectTo}`
     log(`Redirecting to: ${directUrl}`)
     window.location.href = directUrl
