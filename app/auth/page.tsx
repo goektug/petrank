@@ -67,18 +67,23 @@ function AuthContent() {
       
       log('Starting GitHub OAuth flow...')
       
-      // Use the production URL explicitly for Vercel deployments
-      const productionUrl = 'https://petrank.vercel.app'
-      log(`Production URL: ${productionUrl}`)
+      // Generate a state parameter for security
+      const stateParam = Math.random().toString(36).substring(2, 15)
+      log(`Generated state parameter: ${stateParam}`)
       
       // The redirectTo must be a full URL to your API endpoint
-      const redirectTo = `${productionUrl}/api/github`
+      const redirectTo = `https://petrank.vercel.app/api/github`
       log(`Setting redirect to: ${redirectTo}`)
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo: redirectTo
+          redirectTo: redirectTo,
+          queryParams: {
+            // Add optional query params for the OAuth provider
+            // This helps ensure the state parameter is properly handled
+            state: stateParam
+          }
         }
       })
 
@@ -89,7 +94,11 @@ function AuthContent() {
       }
 
       log(`OAuth initiated. URL: ${data?.url || 'No URL returned'}`)
-      log('Redirecting to GitHub for authorization...')
+      if (data?.url) {
+        log(`State parameter should be included in the URL`)
+        log('Redirecting to GitHub for authorization...')
+        window.location.href = data.url
+      }
       
     } catch (err) {
       log(`Login error: ${err instanceof Error ? err.message : 'Unknown error'}`)
@@ -106,15 +115,20 @@ function AuthContent() {
     // Supabase project URL
     const supabaseUrl = 'https://cblsslcreohsrhnurfev.supabase.co'
     
+    // Generate a state parameter for security
+    const stateParam = Math.random().toString(36).substring(2, 15)
+    log(`Generated state parameter: ${stateParam}`)
+    
     // Full URL to the API endpoint that will handle the code
     const redirectUrl = 'https://petrank.vercel.app/api/github'
     const encodedRedirect = encodeURIComponent(redirectUrl)
     
     log(`Supabase URL: ${supabaseUrl}`)
     log(`Redirect URL: ${redirectUrl}`)
+    log(`State parameter: ${stateParam}`)
     
-    // Create the direct GitHub authorization URL
-    const directUrl = `${supabaseUrl}/auth/v1/authorize?provider=github&redirect_to=${encodedRedirect}`
+    // Create the direct GitHub authorization URL with state parameter
+    const directUrl = `${supabaseUrl}/auth/v1/authorize?provider=github&redirect_to=${encodedRedirect}&state=${stateParam}`
     log(`Full authorization URL: ${directUrl}`)
     
     // Navigate to the authorization URL
