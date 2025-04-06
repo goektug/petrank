@@ -3,24 +3,42 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  const res = NextResponse.next()
-  const supabase = createMiddlewareClient({ req: request, res })
+  const requestUrl = new URL(request.url)
+  const code = requestUrl.searchParams.get('code')
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  // If there's a code parameter in the URL, it's an OAuth callback
+  if (code) {
+    try {
+      const supabase = createMiddlewareClient({ req: request, res: NextResponse.next() })
+      
+      // Exchange the code for a session
+      await supabase.auth.exchangeCodeForSession(code)
 
-  // If there's no session and the user is trying to access /admin
-  if (!session && request.nextUrl.pathname.startsWith('/admin')) {
-    const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = '/auth'
-    redirectUrl.searchParams.set('redirectTo', request.nextUrl.pathname)
-    return NextResponse.redirect(redirectUrl)
+      // Redirect to admin page after successful authentication
+      return NextResponse.redirect(new URL('/admin', requestUrl.origin))
+    } catch (error) {
+      console.error('Error in OAuth callback:', error)
+      return NextResponse.redirect(new URL('/auth?error=Authentication failed', requestUrl.origin))
+    }
   }
 
-  return res
+  // For admin routes, check if user is authenticated
+  if (requestUrl.pathname.startsWith('/admin')) {
+    const supabase = createMiddlewareClient({ req: request, res: NextResponse.next() })
+    const { data: { session } } = await supabase.auth.getSession()
+
+    if (!session) {
+      return NextResponse.redirect(new URL('/auth', requestUrl.origin))
+    }
+  }
+
+  return NextResponse.next()
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/auth/callback']
+  matcher: [
+    '/admin/:path*',
+    '/',  // Add root path to handle GitHub callback
+    '/auth/callback'
+  ]
 } 
