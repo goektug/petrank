@@ -46,17 +46,17 @@ function AuthContent() {
       
       console.log('Starting GitHub OAuth flow...')
       
-      // Determine the redirect URL based on the environment
-      const redirectTo = process.env.NODE_ENV === 'production'
-        ? 'https://petrank.vercel.app/admin'
-        : 'http://localhost:3000/admin'
-
+      // Get the current domain dynamically
+      const redirectTo = `${window.location.origin}/admin`
       console.log('Using redirect URL:', redirectTo)
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo
+          redirectTo,
+          queryParams: {
+            redirect_to: redirectTo
+          }
         }
       })
 
