@@ -59,7 +59,10 @@ function AuthContent() {
       console.log('Starting GitHub OAuth flow...')
       
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'github'
+        provider: 'github',
+        options: {
+          redirectTo: `${window.location.origin}/auth`
+        }
       })
 
       if (error) {
