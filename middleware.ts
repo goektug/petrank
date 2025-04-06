@@ -8,10 +8,12 @@ export async function middleware(request: NextRequest) {
   // Log all requests that pass through middleware
   console.log(`Middleware handling request to: ${requestUrl.pathname}`)
 
-  // If we detect a code parameter in the root URL, redirect to our code-redirect route
-  if (requestUrl.pathname === '/' && requestUrl.searchParams.has('code')) {
-    console.log('Code parameter detected at root, redirecting to code-redirect route')
-    return NextResponse.redirect(new URL('/code-redirect', requestUrl.origin))
+  // If we detect a code parameter in the URL, redirect to our GitHub API route
+  if (requestUrl.searchParams.has('code')) {
+    console.log(`Code parameter detected in URL: ${requestUrl.pathname}`)
+    const code = requestUrl.searchParams.get('code')
+    console.log(`Redirecting code ${code?.substring(0, 8)}... to API route`)
+    return NextResponse.redirect(new URL(`/api/github?code=${code}`, requestUrl.origin))
   }
 
   // For admin routes, check if user is authenticated
@@ -46,6 +48,7 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/admin/:path*',
-    '/' // Match root path to detect 'code' parameter
+    '/', // Match root path to detect 'code' parameter
+    '/:path*' // Match all paths to catch code parameter anywhere
   ]
 } 
