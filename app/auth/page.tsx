@@ -7,34 +7,54 @@ import { useRouter, useSearchParams } from 'next/navigation'
 function AuthContent() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [logs, setLogs] = useState<string[]>([])
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClientComponentClient()
+
+  // Custom log function that both logs to console and adds to visible logs
+  const log = (message: string) => {
+    console.log(message)
+    setLogs((prevLogs) => [...prevLogs, `${new Date().toISOString().slice(11, 19)}: ${message}`])
+  }
 
   useEffect(() => {
     // Check for error in URL params
     const errorMsg = searchParams.get('error')
     if (errorMsg) {
       setError(decodeURIComponent(errorMsg))
+      log(`Error from URL: ${errorMsg}`)
     }
     
+    // Check for code in URL params
+    const code = searchParams.get('code')
+    if (code) {
+      log(`Code detected in URL: ${code.slice(0, 8)}...`)
+    }
+    
+    log('Page loaded, checking user session')
     checkUser()
   }, [searchParams])
 
   const checkUser = async () => {
     try {
+      log('Checking for existing session')
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       
       if (sessionError) {
+        log(`Session check error: ${sessionError.message}`)
         console.error('Session check error:', sessionError)
         return
       }
 
       if (session) {
-        console.log('Session found, redirecting to admin...')
+        log('Session found, redirecting to admin...')
         router.push('/admin')
+      } else {
+        log('No session found')
       }
     } catch (err) {
+      log(`Error checking session: ${err instanceof Error ? err.message : 'Unknown error'}`)
       console.error('Error checking session:', err)
       setError(err instanceof Error ? err.message : 'Failed to authenticate')
     }
@@ -45,7 +65,7 @@ function AuthContent() {
       setLoading(true)
       setError(null)
       
-      console.log('Starting GitHub OAuth flow...')
+      log('Starting GitHub OAuth flow...')
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
@@ -56,19 +76,30 @@ function AuthContent() {
       })
 
       if (error) {
+        log(`OAuth error: ${error.message}`)
         console.error('OAuth error:', error)
         throw error
       }
 
-      console.log('OAuth initiated:', data)
-      console.log('Redirecting to GitHub for authorization...')
+      log(`OAuth initiated: ${JSON.stringify(data)}`)
+      log('Redirecting to GitHub for authorization...')
       
     } catch (err) {
+      log(`Login error: ${err instanceof Error ? err.message : 'Unknown error'}`)
       console.error('Login error:', err)
       setError(err instanceof Error ? err.message : 'Failed to login with GitHub')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleDirectLogin = () => {
+    log('Using direct OAuth URL...')
+    const supabaseUrl = 'https://cblsslcreohsrhnurfev.supabase.co'
+    const redirectTo = encodeURIComponent(`${window.location.origin}/admin`)
+    const directUrl = `${supabaseUrl}/auth/v1/authorize?provider=github&redirect_to=${redirectTo}`
+    log(`Redirecting to: ${directUrl}`)
+    window.location.href = directUrl
   }
 
   return (
@@ -116,6 +147,31 @@ function AuthContent() {
               </span>
             )}
           </button>
+          
+          <div className="mt-3">
+            <button
+              onClick={handleDirectLogin}
+              className="group relative w-full flex justify-center py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              <span className="flex items-center">
+                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
+                </svg>
+                Try Direct GitHub Login
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Logs display */}
+        <div className="mt-6 border border-gray-200 rounded-md p-2 bg-gray-50">
+          <h3 className="text-sm font-semibold mb-2">Debug Logs:</h3>
+          <div className="bg-white p-2 rounded text-xs font-mono h-40 overflow-y-auto">
+            {logs.length > 0 ? 
+              logs.map((log, index) => <div key={index} className="mb-1">{log}</div>) : 
+              <div className="text-gray-400">No logs yet...</div>
+            }
+          </div>
         </div>
       </div>
     </div>
