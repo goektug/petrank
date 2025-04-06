@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, Suspense } from 'react'
 import Link from 'next/link'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
@@ -17,10 +17,20 @@ interface PetUpload {
   created_at: string
 }
 
-export default function AdminPage() {
+interface UserProfile {
+  email: string | null
+  avatarUrl: string | null
+  name: string | null
+  id: string
+  lastSignIn: string | null
+}
+
+function AdminDashboard() {
   const [pendingUploads, setPendingUploads] = useState<PetUpload[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [sessionChecked, setSessionChecked] = useState(false)
   const supabase = createClientComponentClient()
   const router = useRouter()
 
@@ -29,26 +39,56 @@ export default function AdminPage() {
   }, [])
 
   useEffect(() => {
-    fetchPendingUploads()
-  }, [])
+    if (sessionChecked && userProfile) {
+      fetchPendingUploads()
+    }
+  }, [sessionChecked, userProfile])
 
   const checkUser = async () => {
     try {
+      console.log('Checking user session...')
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
       if (sessionError) {
         console.error('Session error:', sessionError)
-        router.push('/auth')
+        router.push('/auth?error=Session error. Please sign in again.')
         return
       }
+      
       if (!session) {
         console.log('No session found, redirecting to auth')
         router.push('/auth')
         return
       }
-      console.log('User authenticated:', session.user.email)
+      
+      // Extract user info from session
+      const { user } = session
+      console.log('User authenticated:', user.email)
+      
+      // Get user metadata and profile information
+      const { data: userData, error: userError } = await supabase.auth.getUser()
+      
+      if (userError) {
+        console.error('Error getting user details:', userError)
+      }
+      
+      // Set user profile information
+      setUserProfile({
+        email: user.email,
+        avatarUrl: user.user_metadata?.avatar_url || null,
+        name: user.user_metadata?.user_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Admin User',
+        id: user.id,
+        lastSignIn: user.last_sign_in_at
+      })
+      
+      console.log('User profile set:', userData?.user)
+      setSessionChecked(true)
     } catch (err) {
       console.error('Error checking session:', err)
-      router.push('/auth')
+      setError('Authentication error. Please try signing in again.')
+      setTimeout(() => {
+        router.push('/auth')
+      }, 3000)
     }
   }
 
@@ -166,6 +206,7 @@ export default function AdminPage() {
         console.error('Error signing out:', error)
         throw error
       }
+      console.log('User signed out successfully')
       router.push('/auth')
     } catch (err) {
       console.error('Error during sign out:', err)
@@ -188,6 +229,23 @@ export default function AdminPage() {
     <div className="container mx-auto px-4 py-8">
       <header className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Admin Panel</h1>
+        
+        {userProfile && (
+          <div className="flex items-center">
+            {userProfile.avatarUrl && (
+              <img 
+                src={userProfile.avatarUrl} 
+                alt={userProfile.name || 'User'} 
+                className="w-10 h-10 rounded-full mr-3"
+              />
+            )}
+            <div className="mr-4 text-right">
+              <p className="font-medium">{userProfile.name}</p>
+              <p className="text-sm text-gray-600">{userProfile.email}</p>
+            </div>
+          </div>
+        )}
+        
         <div className="flex gap-4">
           <Link 
             href="/"
@@ -253,29 +311,64 @@ export default function AdminPage() {
                       </a>
                     </p>
                   )}
-                  <p>Status: {upload.status}</p>
+                  <p>Status: <span className={`font-medium ${
+                    upload.status === 'pending' ? 'text-yellow-600' : 
+                    upload.status === 'approved' ? 'text-green-600' : 
+                    'text-red-600'
+                  }`}>{upload.status}</span></p>
                 </div>
-                {upload.status === 'pending' && (
-                  <div className="flex gap-2 mt-4">
-                    <button 
-                      onClick={() => handleAction(upload.id, 'approve')}
-                      className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
-                    >
-                      Approve
-                    </button>
-                    <button 
+                
+                <div className="flex gap-2 mt-3">
+                  {upload.status === 'pending' && (
+                    <>
+                      <button
+                        onClick={() => handleAction(upload.id, 'approve')}
+                        className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleAction(upload.id, 'reject')}
+                        className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                      >
+                        Reject
+                      </button>
+                    </>
+                  )}
+                  {upload.status === 'approved' && (
+                    <button
                       onClick={() => handleAction(upload.id, 'reject')}
-                      className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
+                      className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
                     >
                       Reject
                     </button>
-                  </div>
-                )}
+                  )}
+                  {upload.status === 'rejected' && (
+                    <button
+                      onClick={() => handleAction(upload.id, 'approve')}
+                      className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                    >
+                      Approve
+                    </button>
+                  )}
+                </div>
               </div>
             ))
           )}
         </div>
       </div>
     </div>
+  )
+}
+
+export default function AdminPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-gray-900"></div>
+      </div>
+    }>
+      <AdminDashboard />
+    </Suspense>
   )
 } 
