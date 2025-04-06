@@ -45,45 +45,21 @@ function HomeContent() {
       setIsProcessingAuth(true)
       console.log('Processing OAuth code...')
       
-      // Instead of handling it here, redirect to our dedicated API route
-      console.log('Redirecting to dedicated OAuth handler...')
-      router.push(`/api/auth/github?code=${code}`)
-      return
+      // Get current site URL
+      const siteUrl = typeof window !== 'undefined' ? window.location.origin : 'https://petrank.vercel.app';
       
-      // The code below is no longer used, as we're redirecting to the API route
-      /*
-      // Exchange code for session
-      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+      // Try the new API route path
+      const apiPath = `/api/auth/github?code=${code}`;
+      console.log(`Redirecting to API route: ${siteUrl}${apiPath}`)
       
-      if (exchangeError) {
-        console.error('Error exchanging code for session:', exchangeError)
-        setError('Authentication error. Please try again.')
-        return
-      }
+      // Use window.location for a full page redirect instead of router.push
+      // This ensures a clean reload and proper cookie handling
+      window.location.href = `${siteUrl}${apiPath}`;
+      return;
       
-      console.log('Code successfully exchanged for session')
-      
-      // Check if session was created
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      
-      if (sessionError) {
-        console.error('Error getting session:', sessionError)
-        setError('Session error. Please try again.')
-        return
-      }
-      
-      if (session) {
-        console.log('Session found, redirecting to admin dashboard')
-        router.push('/admin')
-      } else {
-        console.log('No session created after code exchange')
-        setError('Authentication failed. Please try again.')
-      }
-      */
     } catch (err) {
       console.error('Error handling OAuth code:', err)
       setError('Unexpected error during authentication. Please try again.')
-    } finally {
       setIsProcessingAuth(false)
     }
   }

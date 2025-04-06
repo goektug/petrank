@@ -67,11 +67,19 @@ function AuthContent() {
       
       log('Starting GitHub OAuth flow...')
       
+      // Use the full URL instead of window.location.origin
+      const siteUrl = typeof window !== 'undefined' ? window.location.origin : 'https://petrank.vercel.app';
+      log(`Site URL: ${siteUrl}`)
+      
+      // The redirectTo determines where Supabase will redirect after GitHub auth
+      const redirectTo = `${siteUrl}/api/auth/github`
+      log(`Setting redirect to: ${redirectTo}`)
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo: `${window.location.origin}/api/auth/github`,
-          skipBrowserRedirect: false // Ensure browser is redirected
+          redirectTo: redirectTo,
+          skipBrowserRedirect: false
         }
       })
 
@@ -81,7 +89,7 @@ function AuthContent() {
         throw error
       }
 
-      log(`OAuth initiated: ${JSON.stringify(data)}`)
+      log(`OAuth initiated. URL: ${data?.url || 'No URL returned'}`)
       log('Redirecting to GitHub for authorization...')
       
     } catch (err) {
@@ -96,9 +104,17 @@ function AuthContent() {
   const handleDirectLogin = () => {
     log('Using direct OAuth URL...')
     const supabaseUrl = 'https://cblsslcreohsrhnurfev.supabase.co'
-    const redirectTo = encodeURIComponent(`${window.location.origin}/api/auth/github`)
+    const siteUrl = typeof window !== 'undefined' ? window.location.origin : 'https://petrank.vercel.app';
+    
+    // Try new API route first
+    const redirectTo = encodeURIComponent(`${siteUrl}/api/auth/github`)
+    
+    log(`Supabase URL: ${supabaseUrl}`)
+    log(`Redirect URL: ${redirectTo}`)
+    
     const directUrl = `${supabaseUrl}/auth/v1/authorize?provider=github&redirect_to=${redirectTo}`
-    log(`Redirecting to: ${directUrl}`)
+    log(`Full authorization URL: ${directUrl}`)
+    
     window.location.href = directUrl
   }
 
