@@ -9,14 +9,14 @@ export async function GET(request: Request) {
   if (code) {
     const cookieStore = cookies()
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
-    
-    try {
-      await supabase.auth.exchangeCodeForSession(code)
-    } catch (error) {
-      console.error('Error in callback:', error)
-      return NextResponse.redirect(`${requestUrl.origin}/auth?error=Unable to sign in`)
-    }
+
+    // Exchange the code for a session
+    await supabase.auth.exchangeCodeForSession(code)
+
+    // Redirect to admin page after successful authentication
+    return NextResponse.redirect(new URL('/admin', requestUrl.origin))
   }
 
-  return NextResponse.redirect(`${requestUrl.origin}/admin`)
+  // If no code, redirect to auth page
+  return NextResponse.redirect(new URL('/auth', requestUrl.origin))
 } 
