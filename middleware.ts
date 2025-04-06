@@ -14,6 +14,8 @@ export async function middleware(request: NextRequest) {
       console.log('No session found, redirecting to auth page')
       return NextResponse.redirect(new URL('/auth', requestUrl.origin))
     }
+
+    console.log('Session found, allowing access to admin page')
   }
 
   return NextResponse.next()

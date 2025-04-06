@@ -60,6 +60,7 @@ function AuthContent() {
       }
 
       console.log('OAuth initiated:', data)
+      console.log('Redirecting to GitHub for authorization...')
       
     } catch (err) {
       console.error('Login error:', err)
