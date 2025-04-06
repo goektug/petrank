@@ -4,9 +4,10 @@ import React, { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 interface UploadModalProps {
-  isOpen: boolean
+  isOpen?: boolean
   onClose: () => void
   initialFile?: File | null
+  file?: File | null
 }
 
 interface PetUpload {
@@ -19,12 +20,12 @@ interface PetUpload {
   status: 'pending' | 'approved' | 'rejected'
 }
 
-export default function UploadModal({ isOpen, onClose, initialFile }: UploadModalProps) {
+export default function UploadModal({ isOpen = true, onClose, initialFile, file }: UploadModalProps) {
   const [petName, setPetName] = useState('')
   const [age, setAge] = useState('')
   const [gender, setGender] = useState('')
   const [socialMediaLink, setSocialMediaLink] = useState('')
-  const [file, setFile] = useState<File | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState('')
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -32,32 +33,34 @@ export default function UploadModal({ isOpen, onClose, initialFile }: UploadModa
   const supabase = createClientComponentClient()
 
   useEffect(() => {
-    if (initialFile) {
-      setFile(initialFile)
+    // Handle both possible prop names for the file
+    const fileToUse = file || initialFile
+    if (fileToUse) {
+      setSelectedFile(fileToUse)
     }
-  }, [initialFile])
+  }, [initialFile, file])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0]
-    if (selectedFile) {
+    const newFile = e.target.files?.[0]
+    if (newFile) {
       // Check file type
-      if (!selectedFile.type.startsWith('image/')) {
+      if (!newFile.type.startsWith('image/')) {
         setError('Please upload an image file')
         return
       }
       // Check file size (5MB limit)
-      if (selectedFile.size > 5 * 1024 * 1024) {
+      if (newFile.size > 5 * 1024 * 1024) {
         setError('File size must be less than 5MB')
         return
       }
-      setFile(selectedFile)
+      setSelectedFile(newFile)
       setError('')
     }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!file || !petName.trim()) {
+    if (!selectedFile || !petName.trim()) {
       setError('Please provide both a pet name and an image')
       return
     }
@@ -97,7 +100,7 @@ export default function UploadModal({ isOpen, onClose, initialFile }: UploadModa
       }
 
       // Upload image to Supabase Storage
-      const fileExt = file.name.split('.').pop()
+      const fileExt = selectedFile.name.split('.').pop()
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
       const filePath = fileName
       
@@ -105,10 +108,10 @@ export default function UploadModal({ isOpen, onClose, initialFile }: UploadModa
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('pet-images')
-        .upload(filePath, file, {
+        .upload(filePath, selectedFile, {
           cacheControl: '3600',
           upsert: false,
-          contentType: file.type
+          contentType: selectedFile.type
         })
 
       if (uploadError) {
@@ -165,7 +168,7 @@ export default function UploadModal({ isOpen, onClose, initialFile }: UploadModa
       setAge('')
       setGender('')
       setSocialMediaLink('')
-      setFile(null)
+      setSelectedFile(null)
       setUploadProgress(100)
     } catch (err) {
       console.error('Upload error:', err)

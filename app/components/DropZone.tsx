@@ -4,10 +4,11 @@ import { useCallback, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 
 interface DropZoneProps {
-  onDrop: (files: File[]) => void
+  onDrop?: (files: File[]) => void
+  onFileDrop?: (files: File[]) => void
 }
 
-export default function DropZone({ onDrop }: DropZoneProps) {
+export default function DropZone({ onDrop, onFileDrop }: DropZoneProps) {
   const [error, setError] = useState<string | null>(null)
 
   const handleDrop = useCallback((acceptedFiles: File[], rejectedFiles: any[]) => {
@@ -23,9 +24,11 @@ export default function DropZone({ onDrop }: DropZoneProps) {
 
     if (acceptedFiles.length > 0) {
       setError(null)
-      onDrop(acceptedFiles)
+      // Call whatever handler is provided
+      if (onDrop) onDrop(acceptedFiles)
+      if (onFileDrop) onFileDrop(acceptedFiles)
     }
-  }, [onDrop])
+  }, [onDrop, onFileDrop])
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop: handleDrop,
