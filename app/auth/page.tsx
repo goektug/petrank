@@ -60,23 +60,23 @@ function AuthContent() {
     }
   }
 
-  const handleGitHubLogin = async () => {
+  const handleGoogleLogin = async () => {
     try {
       setLoading(true)
       setError(null)
       
-      log('Starting GitHub OAuth flow...')
+      log('Starting Google OAuth flow...')
       
       // Generate a state parameter for security
       const stateParam = Math.random().toString(36).substring(2, 15)
       log(`Generated state parameter: ${stateParam}`)
       
       // The redirectTo must be a full URL to your API endpoint
-      const redirectTo = `https://petrank.vercel.app/api/github`
+      const redirectTo = `https://petrank.vercel.app/api/auth/callback`
       log(`Setting redirect to: ${redirectTo}`)
       
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
+        provider: 'google',
         options: {
           redirectTo: redirectTo,
           queryParams: {
@@ -96,14 +96,14 @@ function AuthContent() {
       log(`OAuth initiated. URL: ${data?.url || 'No URL returned'}`)
       if (data?.url) {
         log(`State parameter should be included in the URL`)
-        log('Redirecting to GitHub for authorization...')
+        log('Redirecting to Google for authorization...')
         window.location.href = data.url
       }
       
     } catch (err) {
       log(`Login error: ${err instanceof Error ? err.message : 'Unknown error'}`)
       console.error('Login error:', err)
-      setError(err instanceof Error ? err.message : 'Failed to login with GitHub')
+      setError(err instanceof Error ? err.message : 'Failed to login with Google')
     } finally {
       setLoading(false)
     }
@@ -120,15 +120,15 @@ function AuthContent() {
     log(`Generated state parameter: ${stateParam}`)
     
     // Full URL to the API endpoint that will handle the code
-    const redirectUrl = 'https://petrank.vercel.app/api/github'
+    const redirectUrl = 'https://petrank.vercel.app/api/auth/callback'
     const encodedRedirect = encodeURIComponent(redirectUrl)
     
     log(`Supabase URL: ${supabaseUrl}`)
     log(`Redirect URL: ${redirectUrl}`)
     log(`State parameter: ${stateParam}`)
     
-    // Create the direct GitHub authorization URL with state parameter
-    const directUrl = `${supabaseUrl}/auth/v1/authorize?provider=github&redirect_to=${encodedRedirect}&state=${stateParam}`
+    // Create the direct Google authorization URL with state parameter
+    const directUrl = `${supabaseUrl}/auth/v1/authorize?provider=google&redirect_to=${encodedRedirect}&state=${stateParam}`
     log(`Full authorization URL: ${directUrl}`)
     
     // Navigate to the authorization URL
@@ -146,7 +146,7 @@ function AuthContent() {
             Please sign in to access the admin panel
           </p>
           <p className="mt-2 text-center text-xs text-gray-500">
-            Make sure your GitHub OAuth app has this callback URL:<br />
+            Make sure your Google OAuth app has this callback URL:<br />
             <code className="bg-gray-100 p-1 rounded text-xs">https://cblsslcreohsrhnurfev.supabase.co/auth/v1/callback</code>
           </p>
         </div>
@@ -159,9 +159,9 @@ function AuthContent() {
 
         <div>
           <button
-            onClick={handleGitHubLogin}
+            onClick={handleGoogleLogin}
             disabled={loading}
-            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-gray-800 hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <span className="flex items-center">
@@ -173,10 +173,15 @@ function AuthContent() {
               </span>
             ) : (
               <span className="flex items-center">
-                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 0C4.477 0 0 4.477 0 10c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.604-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C17.137 18.163 20 14.418 20 10c0-5.523-4.477-10-10-10z" clipRule="evenodd" />
+                <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
+                    <path fill="#4285F4" d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z"/>
+                    <path fill="#34A853" d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z"/>
+                    <path fill="#FBBC05" d="M -21.484 53.529 C -21.734 52.809 -21.864 52.039 -21.864 51.239 C -21.864 50.439 -21.724 49.669 -21.484 48.949 L -21.484 45.859 L -25.464 45.859 C -26.284 47.479 -26.754 49.299 -26.754 51.239 C -26.754 53.179 -26.284 54.999 -25.464 56.619 L -21.484 53.529 Z"/>
+                    <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z"/>
+                  </g>
                 </svg>
-                Sign in with GitHub
+                Sign in with Google
               </span>
             )}
           </button>
@@ -184,13 +189,13 @@ function AuthContent() {
           <div className="mt-3">
             <button
               onClick={handleDirectLogin}
-              className="group relative w-full flex justify-center py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              className="group relative w-full flex justify-center py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               <span className="flex items-center">
                 <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
                 </svg>
-                Try Direct GitHub Login
+                Try Direct Google Login
               </span>
             </button>
           </div>

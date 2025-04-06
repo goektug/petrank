@@ -8,12 +8,19 @@ export async function middleware(request: NextRequest) {
   // Log all requests that pass through middleware
   console.log(`Middleware handling request to: ${requestUrl.pathname}`)
 
-  // If we detect a code parameter in the URL, redirect to our GitHub API route
+  // If we detect a code parameter in the URL, redirect to our API route
   if (requestUrl.searchParams.has('code')) {
     console.log(`Code parameter detected in URL: ${requestUrl.pathname}`)
     const code = requestUrl.searchParams.get('code')
+    const state = requestUrl.searchParams.get('state')
     console.log(`Redirecting code ${code?.substring(0, 8)}... to API route`)
-    return NextResponse.redirect(new URL(`/api/github?code=${code}`, requestUrl.origin))
+    
+    // Redirect to our Google OAuth callback API route
+    const redirectUrl = new URL(`/api/auth/callback?code=${code}`, requestUrl.origin)
+    if (state) {
+      redirectUrl.searchParams.append('state', state)
+    }
+    return NextResponse.redirect(redirectUrl)
   }
 
   // For admin routes, check if user is authenticated
