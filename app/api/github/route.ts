@@ -3,11 +3,13 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 
 export async function GET(request: NextRequest) {
-  // Get the URL details
+  // Get URL details for debugging
   const requestUrl = new URL(request.url)
   
-  console.log('Original GitHub API route executed')
+  console.log('GitHub API route executed')
   console.log('Request URL:', request.url)
+  console.log('Path:', requestUrl.pathname)
+  console.log('Search params:', Object.fromEntries(requestUrl.searchParams.entries()))
   
   try {
     // Get code from the URL
@@ -25,6 +27,7 @@ export async function GET(request: NextRequest) {
     console.log('Cookie store created')
     
     try {
+      // Create route handler client
       const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
       console.log('Supabase client created')
       
@@ -35,6 +38,12 @@ export async function GET(request: NextRequest) {
       if (exchangeError) {
         console.error('Error exchanging code for session:', exchangeError.message)
         console.error('Error details:', JSON.stringify(exchangeError))
+        
+        // Try to analyze the error
+        if (exchangeError.message.includes('invalid')) {
+          console.error('This may be due to an invalid or expired code')
+        }
+        
         return NextResponse.redirect(`${requestUrl.origin}/auth?error=${encodeURIComponent(`Auth error: ${exchangeError.message}`)}`)
       }
       
@@ -57,6 +66,7 @@ export async function GET(request: NextRequest) {
       // Success - user is authenticated
       console.log('Authentication successful for user:', session.user.id)
       console.log('User email:', session.user.email)
+      console.log('User metadata:', JSON.stringify(session.user.user_metadata))
       console.log('Redirecting to admin dashboard')
       
       return NextResponse.redirect(`${requestUrl.origin}/admin`)

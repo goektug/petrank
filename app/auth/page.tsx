@@ -67,19 +67,18 @@ function AuthContent() {
       
       log('Starting GitHub OAuth flow...')
       
-      // Use the full URL instead of window.location.origin
-      const siteUrl = typeof window !== 'undefined' ? window.location.origin : 'https://petrank.vercel.app';
-      log(`Site URL: ${siteUrl}`)
+      // Use the production URL explicitly for Vercel deployments
+      const productionUrl = 'https://petrank.vercel.app'
+      log(`Production URL: ${productionUrl}`)
       
-      // The redirectTo determines where Supabase will redirect after GitHub auth
-      const redirectTo = `${siteUrl}/api/auth/github`
+      // The redirectTo must be a full URL to your API endpoint
+      const redirectTo = `${productionUrl}/api/github`
       log(`Setting redirect to: ${redirectTo}`)
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo: redirectTo,
-          skipBrowserRedirect: false
+          redirectTo: redirectTo
         }
       })
 
@@ -103,18 +102,22 @@ function AuthContent() {
 
   const handleDirectLogin = () => {
     log('Using direct OAuth URL...')
-    const supabaseUrl = 'https://cblsslcreohsrhnurfev.supabase.co'
-    const siteUrl = typeof window !== 'undefined' ? window.location.origin : 'https://petrank.vercel.app';
     
-    // Try new API route first
-    const redirectTo = encodeURIComponent(`${siteUrl}/api/auth/github`)
+    // Supabase project URL
+    const supabaseUrl = 'https://cblsslcreohsrhnurfev.supabase.co'
+    
+    // Full URL to the API endpoint that will handle the code
+    const redirectUrl = 'https://petrank.vercel.app/api/github'
+    const encodedRedirect = encodeURIComponent(redirectUrl)
     
     log(`Supabase URL: ${supabaseUrl}`)
-    log(`Redirect URL: ${redirectTo}`)
+    log(`Redirect URL: ${redirectUrl}`)
     
-    const directUrl = `${supabaseUrl}/auth/v1/authorize?provider=github&redirect_to=${redirectTo}`
+    // Create the direct GitHub authorization URL
+    const directUrl = `${supabaseUrl}/auth/v1/authorize?provider=github&redirect_to=${encodedRedirect}`
     log(`Full authorization URL: ${directUrl}`)
     
+    // Navigate to the authorization URL
     window.location.href = directUrl
   }
 
