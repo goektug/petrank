@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-export default function HandleAuth() {
+function HandleAuthContent() {
   const [logs, setLogs] = useState<string[]>([])
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing')
   const [message, setMessage] = useState('Processing authentication...')
@@ -131,5 +131,17 @@ export default function HandleAuth() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function HandleAuth() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 p-8 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    }>
+      <HandleAuthContent />
+    </Suspense>
   )
 } 
