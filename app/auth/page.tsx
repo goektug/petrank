@@ -50,7 +50,8 @@ function AuthContent() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo: `${window.location.origin}/admin`
+          redirectTo: `${window.location.origin}/admin`,
+          skipBrowserRedirect: false // Ensure browser is redirected
         }
       })
 
@@ -79,6 +80,10 @@ function AuthContent() {
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Please sign in to access the admin panel
+          </p>
+          <p className="mt-2 text-center text-xs text-gray-500">
+            Make sure your GitHub OAuth app has this callback URL:<br />
+            <code className="bg-gray-100 p-1 rounded text-xs">https://cblsslcreohsrhnurfev.supabase.co/auth/v1/callback</code>
           </p>
         </div>
         
