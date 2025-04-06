@@ -45,6 +45,13 @@ function HomeContent() {
       setIsProcessingAuth(true)
       console.log('Processing OAuth code...')
       
+      // Instead of handling it here, redirect to our dedicated API route
+      console.log('Redirecting to dedicated OAuth handler...')
+      router.push(`/api/auth/github?code=${code}`)
+      return
+      
+      // The code below is no longer used, as we're redirecting to the API route
+      /*
       // Exchange code for session
       const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
       
@@ -72,6 +79,7 @@ function HomeContent() {
         console.log('No session created after code exchange')
         setError('Authentication failed. Please try again.')
       }
+      */
     } catch (err) {
       console.error('Error handling OAuth code:', err)
       setError('Unexpected error during authentication. Please try again.')
