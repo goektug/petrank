@@ -23,6 +23,17 @@ function AuthContent() {
 
   const checkUser = async () => {
     try {
+      // If we have a code in the URL, we need to exchange it for a session
+      const code = searchParams.get('code')
+      if (code) {
+        console.log('Exchanging code for session...')
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+        if (exchangeError) {
+          console.error('Code exchange error:', exchangeError)
+          throw exchangeError
+        }
+      }
+
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       
       if (sessionError) {
@@ -31,11 +42,12 @@ function AuthContent() {
       }
 
       if (session) {
-        const redirectTo = searchParams.get('redirectTo') || '/admin'
-        router.push(redirectTo)
+        console.log('Session found, redirecting to admin...')
+        router.push('/admin')
       }
     } catch (err) {
       console.error('Error checking session:', err)
+      setError(err instanceof Error ? err.message : 'Failed to authenticate')
     }
   }
 
@@ -47,10 +59,7 @@ function AuthContent() {
       console.log('Starting GitHub OAuth flow...')
       
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
-        options: {
-          redirectTo: `${window.location.origin}/admin`
-        }
+        provider: 'github'
       })
 
       if (error) {
