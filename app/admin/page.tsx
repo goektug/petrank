@@ -18,11 +18,11 @@ interface PetUpload {
 }
 
 interface UserProfile {
-  email: string | null
+  email: string | null | undefined
   avatarUrl: string | null
   name: string | null
   id: string
-  lastSignIn: string | null
+  lastSignIn: string | null | undefined
 }
 
 function AdminDashboard() {
