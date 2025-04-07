@@ -226,6 +226,9 @@ function HomeContent() {
           <div 
             className="relative bg-white rounded-lg shadow-lg overflow-hidden cursor-pointer transform transition-transform hover:scale-105 mx-auto max-w-4xl"
             onClick={(e) => handleClick(e, petImages[0])}
+            onTouchStart={(e) => handleTouchStart(e, petImages[0])}
+            onTouchEnd={(e) => handleTouchEnd(e, petImages[0])}
+            onTouchCancel={(e) => e.preventDefault()}
           >
             {petImages[0].image_url ? (
               <div className="relative">
