@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
-import { base64ToJson, AuthState } from '@/app/utils/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +11,7 @@ export async function GET(request: Request) {
     console.log('Search params:', Object.fromEntries(requestUrl.searchParams.entries()))
     
     const code = requestUrl.searchParams.get('code')
-    const payload = requestUrl.searchParams.get('payload')
+    const next = requestUrl.searchParams.get('next') || '/admin'
     
     if (!code) {
       console.error('No code in search params:', requestUrl.search)
@@ -20,10 +19,6 @@ export async function GET(request: Request) {
     }
 
     console.log('Code received:', code.substring(0, 8) + '...')
-    
-    // Parse the auth state from the payload
-    const authState = payload ? base64ToJson<AuthState>(payload) : null
-    console.log('Auth state:', authState)
     
     // Create a cookies instance
     const cookieStore = cookies()
@@ -48,7 +43,6 @@ export async function GET(request: Request) {
     console.log('User email:', session.user.email)
     
     // Successfully authenticated, redirect to next page or admin
-    const next = authState?.next || '/admin'
     return NextResponse.redirect(`${requestUrl.origin}${next}`)
   } catch (error: any) {
     console.error('Auth callback error:', error.message)

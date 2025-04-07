@@ -35,24 +35,9 @@ function GoogleOAuthContent() {
       setError(null)
       log('Starting Google OAuth authentication...')
       
-      // Generate a random state parameter
-      const stateParam = Math.random().toString(36).substring(2, 15)
-      log(`Generated state parameter: ${stateParam}`)
-      
-      // Create the auth state object
-      const authState: AuthState = {
-        provider: 'google',
-        next: '/admin',
-        state: stateParam
-      }
-      
-      // Serialize the auth state
-      const serializedState = jsonToBase64(authState)
-      log(`Serialized auth state: ${serializedState}`)
-      
-      // Construct the callback URL with the serialized state
+      // Construct the callback URL
       const callbackUrl = new URL('/auth/callback', window.location.origin)
-      callbackUrl.searchParams.set('payload', serializedState)
+      callbackUrl.searchParams.set('next', '/admin')
       
       log(`Using callback URL: ${callbackUrl.toString()}`)
       
@@ -63,8 +48,7 @@ function GoogleOAuthContent() {
           scopes: 'email profile',
           queryParams: {
             access_type: 'offline',
-            prompt: 'consent',
-            state: stateParam
+            prompt: 'consent'
           }
         }
       })
