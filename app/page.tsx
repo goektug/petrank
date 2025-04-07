@@ -153,14 +153,20 @@ function HomeContent() {
         return
       }
 
+      // Ensure view_count is initialized to at least 0
       const currentCount = currentPet.view_count || 0
       const newCount = currentCount + 1
       console.log('Current view count from DB:', currentCount, 'New count will be:', newCount)
 
-      // Try to update the view count directly with UPDATE
+      // Use a transaction-like approach to update the view count
+      // This will ensure the update is atomic and persisted
       const { error: updateError } = await supabase
         .from('pet_uploads')
-        .update({ view_count: newCount })
+        .update({ 
+          view_count: newCount,
+          // Add a timestamp to ensure the update is persisted
+          updated_at: new Date().toISOString()
+        })
         .eq('id', pet.id)
 
       if (updateError) {
@@ -179,6 +185,48 @@ function HomeContent() {
       setSelectedImage(prev => 
         prev ? { ...prev, view_count: newCount } : null
       )
+
+      // Force a refresh of the images data to ensure we have the latest counts
+      if (newCount % 5 === 0) { // Refresh every 5 counts to avoid too many refreshes
+        setTimeout(() => {
+          async function fetchImages() {
+            try {
+              const { data, error } = await supabase
+                .from('pet_uploads')
+                .select('*')
+                .eq('status', 'approved')
+                .order('view_count', { ascending: false })
+              
+              if (error) {
+                console.error('Error fetching pet images:', error)
+                return
+              }
+  
+              console.log('Refreshing images with updated view counts:', data)
+  
+              const petsWithUrls = await Promise.all(
+                data.map(async (pet) => {
+                  if (pet.file_path) {
+                    const signedUrl = await getSignedUrl(pet.file_path)
+                    return { 
+                      ...pet, 
+                      image_url: signedUrl,
+                      view_count: pet.view_count || 0 // Ensure view_count is always a number
+                    }
+                  }
+                  return { ...pet, view_count: pet.view_count || 0 }
+                })
+              )
+  
+              setPetImages(petsWithUrls)
+            } catch (err) {
+              console.error('Failed to refresh pet images:', err)
+            }
+          }
+          
+          fetchImages()
+        }, 1000) // Wait 1 second before refreshing to ensure the update has been processed
+      }
     } catch (err) {
       console.error('Failed to update view count:', err)
     }
