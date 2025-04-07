@@ -35,21 +35,11 @@ function GoogleOAuthContent() {
       setError(null)
       log('Starting Google OAuth authentication...')
       
-      // Construct the callback URL
-      const callbackUrl = new URL('/auth/callback', window.location.origin)
-      callbackUrl.searchParams.set('next', '/admin')
-      
-      log(`Using callback URL: ${callbackUrl.toString()}`)
-      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: callbackUrl.toString(),
-          scopes: 'email profile',
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent'
-          }
+          redirectTo: `${window.location.origin}/auth/callback`,
+          scopes: 'email profile'
         }
       })
 
@@ -67,7 +57,6 @@ function GoogleOAuthContent() {
       log(`OAuth URL received: ${data.url}`)
       log('Redirecting to Google authorization...')
       
-      // Use window.location.href to ensure all parameters are preserved
       window.location.href = data.url
       
     } catch (err) {
