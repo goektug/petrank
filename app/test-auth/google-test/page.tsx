@@ -34,10 +34,16 @@ function GoogleOAuthContent() {
       setError(null)
       log('Starting Google OAuth authentication...')
       
+      // Construct the callback URL with the next parameter
+      const callbackUrl = new URL('/auth/callback', window.location.origin)
+      callbackUrl.searchParams.set('next', '/admin')
+      
+      log(`Setting callback URL: ${callbackUrl.toString()}`)
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: callbackUrl.toString(),
           scopes: 'email profile',
           queryParams: {
             access_type: 'offline',
@@ -57,8 +63,11 @@ function GoogleOAuthContent() {
         throw new Error('No authorization URL returned')
       }
 
+      log(`OAuth URL received: ${data.url}`)
       log('Redirecting to Google authorization...')
-      router.push(data.url)
+      
+      // Use window.location.href to ensure all parameters are preserved
+      window.location.href = data.url
       
     } catch (err) {
       log(`Test error: ${err instanceof Error ? err.message : 'Unknown error'}`)
