@@ -34,19 +34,14 @@ function GoogleOAuthContent() {
       setError(null)
       log('Starting Google OAuth authentication...')
       
-      // The redirectTo must be a full URL to your API endpoint
-      const redirectTo = `https://petrank.vercel.app/api/auth/callback`
-      log(`Setting redirect to: ${redirectTo}`)
-      
+      // Let Supabase handle the callback URL - don't specify redirectTo
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: redirectTo,
-          // Remove custom state parameter and let Supabase handle it
           queryParams: {
-            // Add access_type for offline access if needed
             access_type: 'offline'
-          }
+          },
+          redirectTo: `${window.location.origin}/auth/callback`
         }
       })
 
@@ -60,7 +55,7 @@ function GoogleOAuthContent() {
       
       if (data?.url) {
         log('Redirecting to Google authorization...')
-        router.push(data.url)
+        window.location.href = data.url
       }
       
     } catch (err) {
