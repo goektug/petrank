@@ -129,33 +129,52 @@ function HomeContent() {
     setCurrentFile(null)
   }
 
-  const handleImageClick = (pet: PetImage) => {
+  const handleImageClick = async (pet: PetImage) => {
     console.log('Image clicked:', pet.id, 'Device type:', /Mobile|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop')
     setSelectedImage(pet)
     
-    // Update view count - this will work for all devices
-    supabase
-      .from('pet_uploads')
-      .update({ 
-        view_count: (pet.view_count || 0) + 1 
-      })
-      .eq('id', pet.id)
-      .then(({ error }) => {
-        if (error) {
-          console.error('Error updating view count:', error)
-        } else {
-          console.log('View count updated successfully for image:', pet.id)
-          // Update local state with new view count
-          setPetImages(images => 
-            images.map(p => 
-              p.id === pet.id ? { ...p, view_count: (p.view_count || 0) + 1 } : p
-            )
-          )
-          setSelectedImage(prev => 
-            prev ? { ...prev, view_count: (prev.view_count || 0) + 1 } : null
-          )
-        }
-      })
+    try {
+      // First get the current view count
+      const { data: currentPet, error: fetchError } = await supabase
+        .from('pet_uploads')
+        .select('view_count')
+        .eq('id', pet.id)
+        .single()
+
+      if (fetchError) {
+        console.error('Error fetching current view count:', fetchError)
+        return
+      }
+
+      const currentCount = currentPet.view_count || 0
+      const newCount = currentCount + 1
+
+      // Update the database with the new count
+      const { error: updateError } = await supabase
+        .from('pet_uploads')
+        .update({ view_count: newCount })
+        .eq('id', pet.id)
+        .eq('view_count', currentCount) // Ensure we're updating the correct count
+
+      if (updateError) {
+        console.error('Error updating view count:', updateError)
+        return
+      }
+
+      console.log('View count updated successfully for image:', pet.id, 'New count:', newCount)
+      
+      // Update local state with the new count
+      setPetImages(images => 
+        images.map(p => 
+          p.id === pet.id ? { ...p, view_count: newCount } : p
+        )
+      )
+      setSelectedImage(prev => 
+        prev ? { ...prev, view_count: newCount } : null
+      )
+    } catch (err) {
+      console.error('Failed to update view count:', err)
+    }
   }
 
   // Add touch event handler for mobile devices
