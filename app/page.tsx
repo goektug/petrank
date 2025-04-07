@@ -139,10 +139,25 @@ function HomeContent() {
     setSelectedImage(pet)
     
     try {
+      // First get the current view count
+      const { data: currentPet, error: fetchError } = await supabase
+        .from('pet_uploads')
+        .select('view_count')
+        .eq('id', pet.id)
+        .single()
+
+      if (fetchError) {
+        console.error('Error fetching current view count:', fetchError)
+        return
+      }
+
+      const currentCount = currentPet.view_count || 0
+      const newCount = currentCount + 1
+
       // Update the database with the new count
       const { error: updateError } = await supabase
         .from('pet_uploads')
-        .update({ view_count: (pet.view_count || 0) + 1 })
+        .update({ view_count: newCount })
         .eq('id', pet.id)
 
       if (updateError) {
@@ -150,19 +165,6 @@ function HomeContent() {
         return
       }
 
-      // Get the updated view count
-      const { data: updatedPet, error: fetchError } = await supabase
-        .from('pet_uploads')
-        .select('view_count')
-        .eq('id', pet.id)
-        .single()
-
-      if (fetchError) {
-        console.error('Error fetching updated view count:', fetchError)
-        return
-      }
-
-      const newCount = updatedPet.view_count
       console.log('View count updated successfully for image:', pet.id, 'New count:', newCount)
       
       // Update local state with the new count
