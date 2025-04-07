@@ -88,7 +88,7 @@ function HomeContent() {
           .from('pet_uploads')
           .select('*')
           .eq('status', 'approved')
-          .order('created_at', { ascending: false })
+          .order('view_count', { ascending: false })
         
         if (error) {
           console.error('Error fetching pet images:', error)
@@ -170,12 +170,6 @@ function HomeContent() {
   return (
     <main className="container mx-auto px-4 py-8">
       <h1 className="text-4xl font-bold text-center mb-8">Pet Rank</h1>
-
-      <div className="flex justify-center mb-8">
-        <Link href="/auth" className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
-          Admin Login
-        </Link>
-      </div>
 
       {error && (
         <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-8">
