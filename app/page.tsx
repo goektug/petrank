@@ -170,60 +170,57 @@ function HomeContent() {
   }
 
   const handleImageClick = async (pet: PetImage) => {
-    console.log('Image clicked:', pet.id, 'Current view count:', pet.view_count || 0)
-    setSelectedImage(pet)
+    console.log('Image clicked:', pet.id, 'Attempting to increment view count from:', pet.view_count || 0)
+    setSelectedImage(pet) // Show the modal immediately
     
     try {
-      // First directly use the RPC function to increment the view count
+      // Step 1: Call the RPC function to increment the count in the database
       const { error: rpcError } = await supabase
         .rpc('increment_view_count', { pet_id: pet.id })
 
       if (rpcError) {
-        console.error('Error using RPC to increment view count:', rpcError)
-        
-        // Fallback: Try to directly update if RPC fails
-        const { error: updateError } = await supabase
-          .from('pet_uploads')
-          .update({ 
-            view_count: pet.view_count ? pet.view_count + 1 : 1,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', pet.id)
-
-        if (updateError) {
-          console.error('Fallback update also failed:', updateError)
-          return
-        }
+        // If RPC fails, log the error and stop. Don't update local state.
+        console.error('[handleImageClick] Error calling RPC increment_view_count:', rpcError)
+        // Optionally, inform the user the view couldn't be counted
+        // setError("Couldn't record view count. Please try again.");
+        return 
       }
 
-      // Update local state with the new count
-      const newCount = (pet.view_count || 0) + 1
-      console.log('View count updated for image:', pet.id, 'New count:', newCount)
-      
-      // Update our local state with the new count
-      setPetImages(images => 
-        images.map(p => 
-          p.id === pet.id ? { ...p, view_count: newCount } : p
-        )
-      )
-      setSelectedImage(prev => 
-        prev ? { ...prev, view_count: newCount } : null
-      )
+      console.log('[handleImageClick] RPC increment_view_count called successfully for pet:', pet.id)
 
-      // Fetch the updated view count to verify it was properly updated
-      const { data, error } = await supabase
+      // Step 2: Fetch the updated view count from the database to confirm
+      const { data: updatedPetData, error: fetchError } = await supabase
         .from('pet_uploads')
         .select('view_count')
         .eq('id', pet.id)
         .single()
 
-      if (error) {
-        console.error('Error fetching updated view count:', error)
-      } else {
-        console.log('Verified view count from database:', data.view_count)
+      if (fetchError) {
+        // If fetching the updated count fails, log the error and stop.
+        console.error('[handleImageClick] Error fetching updated view count after RPC call:', fetchError)
+        // The count was likely updated in DB, but we can't confirm. 
+        // Decide if local state should be updated optimistically or not.
+        // For now, we won't update local state if we can't confirm.
+        return
       }
+
+      const newCount = updatedPetData.view_count
+      console.log('[handleImageClick] Successfully fetched updated view count:', newCount, 'for pet:', pet.id)
+
+      // Step 3: Update local state with the confirmed new count
+      setPetImages(images => 
+        images.map(p => 
+          p.id === pet.id ? { ...p, view_count: newCount } : p
+        )
+      )
+      // Also update the selected image in the modal if it's still open
+      setSelectedImage(prev => 
+        prev && prev.id === pet.id ? { ...prev, view_count: newCount } : prev
+      )
+
     } catch (err) {
-      console.error('Failed to update view count:', err)
+      // Catch any unexpected errors during the process
+      console.error('[handleImageClick] Unexpected error:', err)
     }
   }
 
