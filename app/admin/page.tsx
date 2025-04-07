@@ -189,19 +189,19 @@ function AdminDashboard() {
                     {upload.view_count !== undefined && (
                       <p>Views: {upload.view_count}</p>
                     )}
+                    {upload.social_media_link && (
+                      <p className="mt-2">
+                        <a 
+                          href={upload.social_media_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-500 hover:text-blue-700"
+                        >
+                          Social Media
+                        </a>
+                      </p>
+                    )}
                   </div>
-                  {upload.social_media_link && (
-                    <div className="mt-3 border-t pt-2">
-                      <a 
-                        href={upload.social_media_link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-500 hover:text-blue-700"
-                      >
-                        Social Media
-                      </a>
-                    </div>
-                  )}
                 </div>
                 
                 <div className="flex gap-2 mt-3">
