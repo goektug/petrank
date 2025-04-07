@@ -32,11 +32,7 @@ function GoogleOAuthContent() {
   const testGoogleAuth = async () => {
     try {
       setError(null)
-      log('Starting test with explicit state parameter...')
-      
-      // Generate a fixed state parameter for testing
-      const stateParam = 'test_state_' + Date.now()
-      log(`Generated test state parameter: ${stateParam}`)
+      log('Starting Google OAuth authentication...')
       
       // The redirectTo must be a full URL to your API endpoint
       const redirectTo = `https://petrank.vercel.app/api/auth/callback`
@@ -46,8 +42,10 @@ function GoogleOAuthContent() {
         provider: 'google',
         options: {
           redirectTo: redirectTo,
+          // Remove custom state parameter and let Supabase handle it
           queryParams: {
-            state: stateParam
+            // Add access_type for offline access if needed
+            access_type: 'offline'
           }
         }
       })
@@ -61,48 +59,14 @@ function GoogleOAuthContent() {
       log(`OAuth initiated. URL: ${data?.url || 'No URL returned'}`)
       
       if (data?.url) {
-        log(`URL contains state parameter: ${data.url.includes('state=')}`)
         log('Redirecting to Google authorization...')
-        window.location.href = data.url
+        router.push(data.url)
       }
       
     } catch (err) {
       log(`Test error: ${err instanceof Error ? err.message : 'Unknown error'}`)
       console.error('Test error:', err)
       setError(err instanceof Error ? err.message : 'Failed to run test')
-    }
-  }
-
-  const testDirectUrl = () => {
-    try {
-      setError(null)
-      log('Testing direct OAuth URL construction...')
-      
-      // Supabase project URL
-      const supabaseUrl = 'https://cblsslcreohsrhnurfev.supabase.co'
-      
-      // Generate a fixed state parameter for testing
-      const stateParam = 'direct_test_state_' + Date.now()
-      log(`Generated direct test state parameter: ${stateParam}`)
-      
-      // Full URL to the API endpoint that will handle the code
-      const redirectUrl = 'https://petrank.vercel.app/api/auth/callback'
-      const encodedRedirect = encodeURIComponent(redirectUrl)
-      
-      log(`Supabase URL: ${supabaseUrl}`)
-      log(`Redirect URL: ${redirectUrl}`)
-      log(`State parameter: ${stateParam}`)
-      
-      // Create the direct Google authorization URL
-      const directUrl = `${supabaseUrl}/auth/v1/authorize?provider=google&redirect_to=${encodedRedirect}&state=${stateParam}`
-      log(`Full authorization URL: ${directUrl}`)
-      
-      // Navigate to the authorization URL
-      window.location.href = directUrl
-    } catch (err) {
-      log(`Direct URL test error: ${err instanceof Error ? err.message : 'Unknown error'}`)
-      console.error('Direct URL test error:', err)
-      setError(err instanceof Error ? err.message : 'Failed to run direct URL test')
     }
   }
 
@@ -134,18 +98,6 @@ function GoogleOAuthContent() {
               </button>
               <p className="mt-2 text-sm text-gray-500">
                 Tests Google OAuth with an explicit state parameter to prevent CSRF attacks
-              </p>
-            </div>
-            
-            <div>
-              <button
-                onClick={testDirectUrl}
-                className="w-full bg-gray-800 hover:bg-gray-900 text-white font-bold py-3 px-6 rounded-md transition duration-200"
-              >
-                Test Direct URL Construction
-              </button>
-              <p className="mt-2 text-sm text-gray-500">
-                Tests direct URL construction for Google OAuth authorization
               </p>
             </div>
             
