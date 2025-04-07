@@ -34,6 +34,10 @@ function GoogleOAuthContent() {
       setError(null)
       log('Starting Google OAuth authentication...')
       
+      // Generate a random state parameter
+      const stateParam = Math.random().toString(36).substring(2, 15)
+      log(`Generated state parameter: ${stateParam}`)
+      
       // Construct the callback URL with the next parameter
       const callbackUrl = new URL('/auth/callback', window.location.origin)
       callbackUrl.searchParams.set('next', '/admin')
@@ -47,7 +51,8 @@ function GoogleOAuthContent() {
           scopes: 'email profile',
           queryParams: {
             access_type: 'offline',
-            prompt: 'consent'
+            prompt: 'consent',
+            state: stateParam
           }
         }
       })
