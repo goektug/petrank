@@ -84,6 +84,7 @@ function HomeContent() {
   useEffect(() => {
     async function fetchImages() {
       try {
+        console.log('Fetching images...')
         const { data, error } = await supabase
           .from('pet_uploads')
           .select('*')
@@ -97,22 +98,32 @@ function HomeContent() {
         }
 
         console.log('Raw data from database:', data)
+        
+        // Make sure to set null view_counts to 0
+        const processedData = data.map(pet => ({
+          ...pet,
+          view_count: pet.view_count || 0
+        }))
+
+        // Sort by view_count descending after ensuring all counts exist
+        processedData.sort((a, b) => (b.view_count || 0) - (a.view_count || 0))
+        
+        console.log('Processed data with view counts:', processedData)
 
         const petsWithUrls = await Promise.all(
-          data.map(async (pet) => {
+          processedData.map(async (pet) => {
             if (pet.file_path) {
               const signedUrl = await getSignedUrl(pet.file_path)
               return { 
                 ...pet, 
-                image_url: signedUrl,
-                view_count: pet.view_count || 0 // Ensure view_count is always a number
+                image_url: signedUrl
               }
             }
-            return { ...pet, view_count: pet.view_count || 0 }
+            return pet
           })
         )
 
-        console.log('Processed images with view counts:', petsWithUrls)
+        console.log('Processed images with URLs and view counts:', petsWithUrls)
         setPetImages(petsWithUrls)
       } catch (err) {
         console.error('Failed to fetch pet images:', err)
@@ -141,30 +152,12 @@ function HomeContent() {
     setSelectedImage(pet)
     
     try {
-      // First get the current view count from database
-      const { data: currentPet, error: fetchError } = await supabase
-        .from('pet_uploads')
-        .select('view_count')
-        .eq('id', pet.id)
-        .single()
-
-      if (fetchError) {
-        console.error('Error fetching current view count:', fetchError)
-        return
-      }
-
-      // Ensure view_count is initialized to at least 0
-      const currentCount = currentPet.view_count || 0
-      const newCount = currentCount + 1
-      console.log('Current view count from DB:', currentCount, 'New count will be:', newCount)
-
-      // Use a transaction-like approach to update the view count
-      // This will ensure the update is atomic and persisted
+      // Use a direct SQL UPDATE to increment the view count
+      // This ensures the update is atomic and persisted
       const { error: updateError } = await supabase
         .from('pet_uploads')
         .update({ 
-          view_count: newCount,
-          // Add a timestamp to ensure the update is persisted
+          view_count: pet.view_count ? pet.view_count + 1 : 1,
           updated_at: new Date().toISOString()
         })
         .eq('id', pet.id)
@@ -174,9 +167,11 @@ function HomeContent() {
         return
       }
       
-      console.log('View count updated successfully for image:', pet.id, 'New count:', newCount)
-      
       // Update local state with the new count
+      const newCount = (pet.view_count || 0) + 1
+      console.log('View count updated for image:', pet.id, 'New count:', newCount)
+      
+      // Update our local state with the new count
       setPetImages(images => 
         images.map(p => 
           p.id === pet.id ? { ...p, view_count: newCount } : p
@@ -185,48 +180,6 @@ function HomeContent() {
       setSelectedImage(prev => 
         prev ? { ...prev, view_count: newCount } : null
       )
-
-      // Force a refresh of the images data to ensure we have the latest counts
-      if (newCount % 5 === 0) { // Refresh every 5 counts to avoid too many refreshes
-        setTimeout(() => {
-          async function fetchImages() {
-            try {
-              const { data, error } = await supabase
-                .from('pet_uploads')
-                .select('*')
-                .eq('status', 'approved')
-                .order('view_count', { ascending: false })
-              
-              if (error) {
-                console.error('Error fetching pet images:', error)
-                return
-              }
-  
-              console.log('Refreshing images with updated view counts:', data)
-  
-              const petsWithUrls = await Promise.all(
-                data.map(async (pet) => {
-                  if (pet.file_path) {
-                    const signedUrl = await getSignedUrl(pet.file_path)
-                    return { 
-                      ...pet, 
-                      image_url: signedUrl,
-                      view_count: pet.view_count || 0 // Ensure view_count is always a number
-                    }
-                  }
-                  return { ...pet, view_count: pet.view_count || 0 }
-                })
-              )
-  
-              setPetImages(petsWithUrls)
-            } catch (err) {
-              console.error('Failed to refresh pet images:', err)
-            }
-          }
-          
-          fetchImages()
-        }, 1000) // Wait 1 second before refreshing to ensure the update has been processed
-      }
     } catch (err) {
       console.error('Failed to update view count:', err)
     }
