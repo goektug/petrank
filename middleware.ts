@@ -17,7 +17,7 @@ export async function middleware(request: NextRequest) {
     console.log(`State parameter: ${state || 'MISSING'}`)
     
     // Redirect to our Google OAuth callback API route
-    const redirectUrl = new URL(`/api/auth/callback`, requestUrl.origin)
+    const redirectUrl = new URL(`/auth/callback`, requestUrl.origin)
     redirectUrl.searchParams.set('code', code!)
     if (state) {
       redirectUrl.searchParams.set('state', state)

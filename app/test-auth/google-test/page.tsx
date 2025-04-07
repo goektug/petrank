@@ -38,16 +38,14 @@ function GoogleOAuthContent() {
       const stateParam = Math.random().toString(36).substring(2, 15)
       log(`Generated state parameter: ${stateParam}`)
       
-      // Construct the callback URL with the next parameter
-      const callbackUrl = new URL('/auth/callback', window.location.origin)
-      callbackUrl.searchParams.set('next', '/admin')
-      
-      log(`Setting callback URL: ${callbackUrl.toString()}`)
+      // Use the Supabase callback URL directly
+      const callbackUrl = 'https://cblsslcreohsrhnurfev.supabase.co/auth/v1/callback'
+      log(`Using Supabase callback URL: ${callbackUrl}`)
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: callbackUrl.toString(),
+          redirectTo: callbackUrl,
           scopes: 'email profile',
           queryParams: {
             access_type: 'offline',
