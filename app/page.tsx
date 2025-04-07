@@ -26,6 +26,7 @@ function HomeContent() {
   const [petImages, setPetImages] = useState<PetImage[]>([])
   const [error, setError] = useState<string | null>(null)
   const [selectedImage, setSelectedImage] = useState<PetImage | null>(null)
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null)
   const [isProcessingAuth, setIsProcessingAuth] = useState(false)
   const supabase = createClientComponentClient()
   const router = useRouter()
@@ -169,57 +170,40 @@ function HomeContent() {
     setCurrentFile(null)
   }
 
-  const handleImageClick = async (pet: PetImage) => {
-    console.log('Image clicked:', pet.id, 'Attempting to increment view count from:', pet.view_count || 0)
-    setSelectedImage(pet) // Show the modal immediately
+  const handleImageClick = async (pet: PetImage, index: number) => {
+    console.log('Image clicked:', pet.id, 'at index:', index)
+    setSelectedImage(pet)
+    setSelectedImageIndex(index)
     
     try {
-      // Step 1: Call the RPC function to increment the count in the database
       const { error: rpcError } = await supabase
         .rpc('increment_view_count', { pet_id: pet.id })
-
       if (rpcError) {
-        // If RPC fails, log the error and stop. Don't update local state.
         console.error('[handleImageClick] Error calling RPC increment_view_count:', rpcError)
-        // Optionally, inform the user the view couldn't be counted
-        // setError("Couldn't record view count. Please try again.");
         return 
       }
-
       console.log('[handleImageClick] RPC increment_view_count called successfully for pet:', pet.id)
-
-      // Step 2: Fetch the updated view count from the database to confirm
       const { data: updatedPetData, error: fetchError } = await supabase
         .from('pet_uploads')
         .select('view_count')
         .eq('id', pet.id)
         .single()
-
       if (fetchError) {
-        // If fetching the updated count fails, log the error and stop.
         console.error('[handleImageClick] Error fetching updated view count after RPC call:', fetchError)
-        // The count was likely updated in DB, but we can't confirm. 
-        // Decide if local state should be updated optimistically or not.
-        // For now, we won't update local state if we can't confirm.
         return
       }
-
       const newCount = updatedPetData.view_count
       console.log('[handleImageClick] Successfully fetched updated view count:', newCount, 'for pet:', pet.id)
-
-      // Step 3: Update local state with the confirmed new count
       setPetImages(images => 
         images.map(p => 
           p.id === pet.id ? { ...p, view_count: newCount } : p
         )
       )
-      // Also update the selected image in the modal if it's still open
       setSelectedImage(prev => 
         prev && prev.id === pet.id ? { ...prev, view_count: newCount } : prev
       )
-
+      setSelectedImageIndex(prevIndex => prevIndex === index ? index : prevIndex) 
     } catch (err) {
-      // Catch any unexpected errors during the process
       console.error('[handleImageClick] Unexpected error:', err)
     }
   }
@@ -231,18 +215,37 @@ function HomeContent() {
   }
 
   // Add touch end handler to ensure the event is processed
-  const handleTouchEnd = (e: React.TouchEvent, pet: PetImage) => {
-    e.preventDefault() // Prevent default behavior
-    console.log('Touch end on image:', pet.id)
-    handleImageClick(pet)
+  const handleTouchEnd = (e: React.TouchEvent, pet: PetImage, index: number) => {
+    e.preventDefault()
+    console.log('Touch end on image:', pet.id, 'at index:', index)
+    handleImageClick(pet, index)
   }
 
   // Add click handler for desktop devices
-  const handleClick = (e: React.MouseEvent, pet: PetImage) => {
-    e.preventDefault() // Prevent default behavior
-    console.log('Click on image:', pet.id, 'from device:', navigator.userAgent)
-    handleImageClick(pet)
+  const handleClick = (e: React.MouseEvent, pet: PetImage, index: number) => {
+    e.preventDefault()
+    console.log('Click on image:', pet.id, 'at index:', index)
+    handleImageClick(pet, index)
   }
+
+  // --- Navigation Functions ---
+  const navigateImage = (direction: 'next' | 'prev') => {
+    if (selectedImageIndex === null || petImages.length <= 1) return;
+
+    let nextIndex;
+    if (direction === 'next') {
+      nextIndex = (selectedImageIndex + 1) % petImages.length;
+    } else {
+      nextIndex = (selectedImageIndex - 1 + petImages.length) % petImages.length;
+    }
+
+    const nextImage = petImages[nextIndex];
+    console.log(`Navigating ${direction} to index ${nextIndex}, image ID: ${nextImage.id}`);
+    setSelectedImage(nextImage);
+    setSelectedImageIndex(nextIndex);
+    // Optional: Increment view count on navigation?
+    // handleImageClick(nextImage, nextIndex); 
+  };
 
   // If processing auth, show loading state
   if (isProcessingAuth) {
@@ -269,9 +272,9 @@ function HomeContent() {
         <div className="mb-8">
           <div 
             className="relative bg-white rounded-lg shadow-lg overflow-hidden cursor-pointer transform transition-transform hover:scale-105 mx-auto max-w-4xl"
-            onClick={(e) => handleClick(e, petImages[0])}
+            onClick={(e) => handleClick(e, petImages[0], 0)}
             onTouchStart={(e) => handleTouchStart(e, petImages[0])}
-            onTouchEnd={(e) => handleTouchEnd(e, petImages[0])}
+            onTouchEnd={(e) => handleTouchEnd(e, petImages[0], 0)}
             onTouchCancel={(e) => e.preventDefault()}
           >
             {petImages[0].image_url ? (
@@ -319,13 +322,15 @@ function HomeContent() {
 
       {petImages.length > 1 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {petImages.slice(1).map((pet) => (
+          {petImages.slice(1).map((pet, idx) => {
+            const originalIndex = idx + 1;
+            return (
             <div 
               key={pet.id} 
               className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer transform transition-transform hover:scale-105"
-              onClick={(e) => handleClick(e, pet)}
+              onClick={(e) => handleClick(e, pet, originalIndex)}
               onTouchStart={(e) => handleTouchStart(e, pet)}
-              onTouchEnd={(e) => handleTouchEnd(e, pet)}
+              onTouchEnd={(e) => handleTouchEnd(e, pet, originalIndex)}
               onTouchCancel={(e) => e.preventDefault()}
             >
               {pet.image_url ? (
@@ -364,7 +369,8 @@ function HomeContent() {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         !petImages[0] && (
@@ -375,20 +381,38 @@ function HomeContent() {
       )}
 
       {/* Image Preview Modal */}
-      {selectedImage && (
+      {selectedImage && selectedImageIndex !== null && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50"
-          onClick={() => setSelectedImage(null)}
+          onClick={() => {
+              setSelectedImage(null);
+              setSelectedImageIndex(null); 
+          }}
         >
+          {/* --- Previous Button --- */}
+          {petImages.length > 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigateImage('prev');
+              }}
+              className="absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-black bg-opacity-50 text-white p-3 rounded-full hover:bg-opacity-75 focus:outline-none text-xl font-bold"
+              aria-label="Previous image"
+            >
+              &lt;
+            </button>
+          )}
+
           <div 
-            className="bg-white rounded-lg max-w-4xl w-full overflow-hidden"
+            className="bg-white rounded-lg max-w-4xl w-full overflow-hidden relative mx-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="relative">
               <img
+                key={selectedImage.id}
                 src={selectedImage.image_url}
                 alt={selectedImage.pet_name}
-                className="w-full h-[500px] object-contain bg-black"
+                className="w-full max-h-[80vh] object-contain bg-black"
               />
               <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded">
                 👁 {selectedImage.view_count || 0} views
@@ -415,13 +439,27 @@ function HomeContent() {
                 )}
               </div>
               <button
-                onClick={() => setSelectedImage(null)}
-                className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded"
+                onClick={() => { setSelectedImage(null); setSelectedImageIndex(null); }}
+                className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded mt-4"
               >
                 Close
               </button>
             </div>
           </div>
+
+          {/* --- Next Button --- */}
+          {petImages.length > 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigateImage('next');
+              }}
+              className="absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-black bg-opacity-50 text-white p-3 rounded-full hover:bg-opacity-75 focus:outline-none text-xl font-bold"
+              aria-label="Next image"
+            >
+              &gt;
+            </button>
+          )}
         </div>
       )}
 
