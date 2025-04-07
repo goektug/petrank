@@ -100,12 +100,17 @@ function HomeContent() {
           data.map(async (pet) => {
             if (pet.file_path) {
               const signedUrl = await getSignedUrl(pet.file_path)
-              return { ...pet, image_url: signedUrl }
+              return { 
+                ...pet, 
+                image_url: signedUrl,
+                view_count: pet.view_count || 0 // Ensure view_count is always a number
+              }
             }
-            return pet
+            return { ...pet, view_count: pet.view_count || 0 }
           })
         )
 
+        console.log('Fetched images with view counts:', petsWithUrls)
         setPetImages(petsWithUrls)
       } catch (err) {
         console.error('Failed to fetch pet images:', err)
