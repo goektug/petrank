@@ -130,9 +130,10 @@ function HomeContent() {
   }
 
   const handleImageClick = (pet: PetImage) => {
+    console.log('Image clicked:', pet.id, 'Device type:', /Mobile|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop')
     setSelectedImage(pet)
     
-    // Update view count
+    // Update view count - this will work for all devices
     supabase
       .from('pet_uploads')
       .update({ 
@@ -143,6 +144,7 @@ function HomeContent() {
         if (error) {
           console.error('Error updating view count:', error)
         } else {
+          console.log('View count updated successfully for image:', pet.id)
           // Update local state with new view count
           setPetImages(images => 
             images.map(p => 
@@ -154,6 +156,18 @@ function HomeContent() {
           )
         }
       })
+  }
+
+  // Add touch event handler for mobile devices
+  const handleTouchStart = (e: React.TouchEvent, pet: PetImage) => {
+    e.preventDefault() // Prevent default touch behavior
+    handleImageClick(pet)
+  }
+
+  // Add touch end handler to ensure the event is processed
+  const handleTouchEnd = (e: React.TouchEvent, pet: PetImage) => {
+    e.preventDefault()
+    handleImageClick(pet)
   }
 
   // If processing auth, show loading state
@@ -233,6 +247,8 @@ function HomeContent() {
               key={pet.id} 
               className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer transform transition-transform hover:scale-105"
               onClick={() => handleImageClick(pet)}
+              onTouchStart={(e) => handleTouchStart(e, pet)}
+              onTouchEnd={(e) => handleTouchEnd(e, pet)}
             >
               {pet.image_url ? (
                 <div className="relative">
