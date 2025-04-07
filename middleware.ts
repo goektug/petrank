@@ -14,11 +14,13 @@ export async function middleware(request: NextRequest) {
     const code = requestUrl.searchParams.get('code')
     const state = requestUrl.searchParams.get('state')
     console.log(`Redirecting code ${code?.substring(0, 8)}... to API route`)
+    console.log(`State parameter: ${state || 'MISSING'}`)
     
     // Redirect to our Google OAuth callback API route
-    const redirectUrl = new URL(`/api/auth/callback?code=${code}`, requestUrl.origin)
+    const redirectUrl = new URL(`/api/auth/callback`, requestUrl.origin)
+    redirectUrl.searchParams.set('code', code!)
     if (state) {
-      redirectUrl.searchParams.append('state', state)
+      redirectUrl.searchParams.set('state', state)
     }
     return NextResponse.redirect(redirectUrl)
   }
