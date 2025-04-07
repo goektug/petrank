@@ -177,19 +177,21 @@ function AdminDashboard() {
                   </div>
                 )}
                 <h3 className="font-medium">{upload.pet_name}</h3>
-                <div className="text-sm text-gray-500 space-y-1 mt-2">
-                  <p>Age: {upload.age}</p>
-                  <p>Gender: {upload.gender}</p>
-                  <p>Status: <span className={`font-medium ${
-                    upload.status === 'pending' ? 'text-yellow-600' : 
-                    upload.status === 'approved' ? 'text-green-600' : 
-                    'text-red-600'
-                  }`}>{upload.status}</span></p>
-                  {upload.view_count !== undefined && (
-                    <p>Views: {upload.view_count}</p>
-                  )}
+                <div className="text-sm text-gray-500 mt-2">
+                  <div className="space-y-1">
+                    <p>Age: {upload.age}</p>
+                    <p>Gender: {upload.gender}</p>
+                    <p>Status: <span className={`font-medium ${
+                      upload.status === 'pending' ? 'text-yellow-600' : 
+                      upload.status === 'approved' ? 'text-green-600' : 
+                      'text-red-600'
+                    }`}>{upload.status}</span></p>
+                    {upload.view_count !== undefined && (
+                      <p>Views: {upload.view_count}</p>
+                    )}
+                  </div>
                   {upload.social_media_link && (
-                    <p>
+                    <div className="mt-3 border-t pt-2">
                       <a 
                         href={upload.social_media_link}
                         target="_blank"
@@ -198,7 +200,7 @@ function AdminDashboard() {
                       >
                         Social Media
                       </a>
-                    </p>
+                    </div>
                   )}
                 </div>
                 
