@@ -137,11 +137,11 @@ function HomeContent() {
   }
 
   const handleImageClick = async (pet: PetImage) => {
-    console.log('Image clicked:', pet.id, 'Device type:', /Mobile|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop')
+    console.log('Image clicked:', pet.id, 'Current view count:', pet.view_count || 0)
     setSelectedImage(pet)
     
     try {
-      // First get the current view count
+      // First get the current view count from database
       const { data: currentPet, error: fetchError } = await supabase
         .from('pet_uploads')
         .select('view_count')
@@ -153,30 +153,21 @@ function HomeContent() {
         return
       }
 
-      console.log('Current view count:', currentPet.view_count)
+      const currentCount = currentPet.view_count || 0
+      const newCount = currentCount + 1
+      console.log('Current view count from DB:', currentCount, 'New count will be:', newCount)
 
-      // Use the database function to increment the view count
-      const { error: incrementError } = await supabase
-        .rpc('increment_view_count', { pet_id: pet.id })
-
-      if (incrementError) {
-        console.error('Error incrementing view count:', incrementError)
-        return
-      }
-
-      // Get the updated view count
-      const { data: updatedPet, error: updatedFetchError } = await supabase
+      // Try to update the view count directly with UPDATE
+      const { error: updateError } = await supabase
         .from('pet_uploads')
-        .select('view_count')
+        .update({ view_count: newCount })
         .eq('id', pet.id)
-        .single()
 
-      if (updatedFetchError) {
-        console.error('Error fetching updated view count:', updatedFetchError)
+      if (updateError) {
+        console.error('Error updating view count:', updateError)
         return
       }
-
-      const newCount = updatedPet.view_count
+      
       console.log('View count updated successfully for image:', pet.id, 'New count:', newCount)
       
       // Update local state with the new count
