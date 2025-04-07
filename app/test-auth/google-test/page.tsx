@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { jsonToBase64, AuthState } from '@/app/utils/auth'
 
 // Create a separate client component for the content that uses useSearchParams
 function GoogleOAuthContent() {
@@ -38,14 +39,27 @@ function GoogleOAuthContent() {
       const stateParam = Math.random().toString(36).substring(2, 15)
       log(`Generated state parameter: ${stateParam}`)
       
-      // Use the Supabase callback URL directly
-      const callbackUrl = 'https://cblsslcreohsrhnurfev.supabase.co/auth/v1/callback'
-      log(`Using Supabase callback URL: ${callbackUrl}`)
+      // Create the auth state object
+      const authState: AuthState = {
+        provider: 'google',
+        next: '/admin',
+        state: stateParam
+      }
+      
+      // Serialize the auth state
+      const serializedState = jsonToBase64(authState)
+      log(`Serialized auth state: ${serializedState}`)
+      
+      // Construct the callback URL with the serialized state
+      const callbackUrl = new URL('/auth/callback', window.location.origin)
+      callbackUrl.searchParams.set('payload', serializedState)
+      
+      log(`Using callback URL: ${callbackUrl.toString()}`)
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: callbackUrl,
+          redirectTo: callbackUrl.toString(),
           scopes: 'email profile',
           queryParams: {
             access_type: 'offline',
