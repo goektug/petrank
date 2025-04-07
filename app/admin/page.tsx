@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
 
@@ -101,6 +102,16 @@ function AdminDashboard() {
     }
   }
 
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+      router.push('/auth')
+    } catch (err) {
+      setError('Failed to sign out')
+    }
+  }
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -114,6 +125,30 @@ function AdminDashboard() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <header className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Admin Panel</h1>
+        <div className="flex gap-4">
+          <Link 
+            href="/"
+            className="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors"
+          >
+            Back to Home
+          </Link>
+          <button
+            onClick={handleSignOut}
+            className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors"
+          >
+            Sign Out
+          </button>
+        </div>
+      </header>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded mb-6">
+          {error}
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-semibold">All Uploads</h2>
