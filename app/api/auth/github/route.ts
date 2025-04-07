@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 
+// Define route configuration using the new format
+export const dynamic = 'force-dynamic';
+export const runtime = 'edge';
+
 export async function GET(request: NextRequest) {
   // Get the URL details
   const requestUrl = new URL(request.url)
@@ -69,11 +73,4 @@ export async function GET(request: NextRequest) {
     console.error('Error stack:', error.stack)
     return NextResponse.redirect(`${requestUrl.origin}/auth?error=${encodeURIComponent(`Unexpected error: ${error.message}`)}`)
   }
-}
-
-// Export a config to increase the response size limit if needed
-export const config = {
-  api: {
-    responseLimit: '8mb',
-  },
 } 
