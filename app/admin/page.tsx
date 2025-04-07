@@ -180,6 +180,14 @@ function AdminDashboard() {
                 <div className="text-sm text-gray-500 space-y-1 mt-2">
                   <p>Age: {upload.age}</p>
                   <p>Gender: {upload.gender}</p>
+                  <p>Status: <span className={`font-medium ${
+                    upload.status === 'pending' ? 'text-yellow-600' : 
+                    upload.status === 'approved' ? 'text-green-600' : 
+                    'text-red-600'
+                  }`}>{upload.status}</span></p>
+                  {upload.view_count !== undefined && (
+                    <p>Views: {upload.view_count}</p>
+                  )}
                   {upload.social_media_link && (
                     <p>
                       <a 
@@ -191,14 +199,6 @@ function AdminDashboard() {
                         Social Media
                       </a>
                     </p>
-                  )}
-                  <p>Status: <span className={`font-medium ${
-                    upload.status === 'pending' ? 'text-yellow-600' : 
-                    upload.status === 'approved' ? 'text-green-600' : 
-                    'text-red-600'
-                  }`}>{upload.status}</span></p>
-                  {upload.view_count !== undefined && (
-                    <p>Views: {upload.view_count}</p>
                   )}
                 </div>
                 
