@@ -84,12 +84,13 @@ function HomeContent() {
   useEffect(() => {
     async function fetchImages() {
       try {
-        console.log('Fetching images...')
+        console.log('Fetching images from database...')
         const { data, error } = await supabase
           .from('pet_uploads')
           .select('*')
           .eq('status', 'approved')
           .order('view_count', { ascending: false })
+          .limit(50) // Limit to reasonable number of images
         
         if (error) {
           console.error('Error fetching pet images:', error)
@@ -97,16 +98,27 @@ function HomeContent() {
           return
         }
 
+        if (!data || data.length === 0) {
+          console.log('No approved images found')
+          setPetImages([])
+          return
+        }
+
         console.log('Raw data from database:', data)
         
-        // Make sure to set null view_counts to 0
+        // Initialize view_count as 0 for any null values
         const processedData = data.map(pet => ({
           ...pet,
-          view_count: pet.view_count || 0
+          view_count: typeof pet.view_count === 'number' ? pet.view_count : 0
         }))
 
-        // Sort by view_count descending after ensuring all counts exist
-        processedData.sort((a, b) => (b.view_count || 0) - (a.view_count || 0))
+        // Log each pet's view count for debugging
+        processedData.forEach(pet => {
+          console.log(`Pet ${pet.pet_name} (${pet.id}): view_count = ${pet.view_count}`)
+        })
+
+        // Sort by view_count descending
+        processedData.sort((a, b) => b.view_count - a.view_count)
         
         console.log('Processed data with view counts:', processedData)
 
@@ -123,7 +135,7 @@ function HomeContent() {
           })
         )
 
-        console.log('Processed images with URLs and view counts:', petsWithUrls)
+        console.log('Processed images with URLs and view counts:', petsWithUrls.map(p => `${p.pet_name}: ${p.view_count}`))
         setPetImages(petsWithUrls)
       } catch (err) {
         console.error('Failed to fetch pet images:', err)
@@ -134,6 +146,16 @@ function HomeContent() {
     if (!isProcessingAuth) {
       fetchImages()
     }
+
+    // Set up a refresh interval to keep view counts updated
+    const refreshInterval = setInterval(() => {
+      if (!isProcessingAuth && !selectedImage) {
+        console.log('Refreshing image data...')
+        fetchImages()
+      }
+    }, 30000) // Refresh every 30 seconds
+
+    return () => clearInterval(refreshInterval)
   }, [isProcessingAuth])
 
   const handleFileDrop = (acceptedFiles: File[]) => {
@@ -152,21 +174,28 @@ function HomeContent() {
     setSelectedImage(pet)
     
     try {
-      // Use a direct SQL UPDATE to increment the view count
-      // This ensures the update is atomic and persisted
-      const { error: updateError } = await supabase
-        .from('pet_uploads')
-        .update({ 
-          view_count: pet.view_count ? pet.view_count + 1 : 1,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', pet.id)
+      // First directly use the RPC function to increment the view count
+      const { error: rpcError } = await supabase
+        .rpc('increment_view_count', { pet_id: pet.id })
 
-      if (updateError) {
-        console.error('Error updating view count:', updateError)
-        return
+      if (rpcError) {
+        console.error('Error using RPC to increment view count:', rpcError)
+        
+        // Fallback: Try to directly update if RPC fails
+        const { error: updateError } = await supabase
+          .from('pet_uploads')
+          .update({ 
+            view_count: pet.view_count ? pet.view_count + 1 : 1,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', pet.id)
+
+        if (updateError) {
+          console.error('Fallback update also failed:', updateError)
+          return
+        }
       }
-      
+
       // Update local state with the new count
       const newCount = (pet.view_count || 0) + 1
       console.log('View count updated for image:', pet.id, 'New count:', newCount)
@@ -180,6 +209,19 @@ function HomeContent() {
       setSelectedImage(prev => 
         prev ? { ...prev, view_count: newCount } : null
       )
+
+      // Fetch the updated view count to verify it was properly updated
+      const { data, error } = await supabase
+        .from('pet_uploads')
+        .select('view_count')
+        .eq('id', pet.id)
+        .single()
+
+      if (error) {
+        console.error('Error fetching updated view count:', error)
+      } else {
+        console.log('Verified view count from database:', data.view_count)
+      }
     } catch (err) {
       console.error('Failed to update view count:', err)
     }
@@ -187,22 +229,21 @@ function HomeContent() {
 
   // Add touch event handler for mobile devices
   const handleTouchStart = (e: React.TouchEvent, pet: PetImage) => {
-    e.preventDefault() // Prevent default touch behavior
     console.log('Touch start on image:', pet.id)
-    handleImageClick(pet)
+    // Don't call handleImageClick here - wait for touch end
   }
 
   // Add touch end handler to ensure the event is processed
   const handleTouchEnd = (e: React.TouchEvent, pet: PetImage) => {
-    e.preventDefault()
+    e.preventDefault() // Prevent default behavior
     console.log('Touch end on image:', pet.id)
     handleImageClick(pet)
   }
 
   // Add click handler for desktop devices
   const handleClick = (e: React.MouseEvent, pet: PetImage) => {
-    e.preventDefault()
-    console.log('Click on image:', pet.id)
+    e.preventDefault() // Prevent default behavior
+    console.log('Click on image:', pet.id, 'from device:', navigator.userAgent)
     handleImageClick(pet)
   }
 
