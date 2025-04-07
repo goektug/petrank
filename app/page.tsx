@@ -96,6 +96,8 @@ function HomeContent() {
           return
         }
 
+        console.log('Raw data from database:', data)
+
         const petsWithUrls = await Promise.all(
           data.map(async (pet) => {
             if (pet.file_path) {
@@ -110,7 +112,7 @@ function HomeContent() {
           })
         )
 
-        console.log('Fetched images with view counts:', petsWithUrls)
+        console.log('Processed images with view counts:', petsWithUrls)
         setPetImages(petsWithUrls)
       } catch (err) {
         console.error('Failed to fetch pet images:', err)
@@ -139,32 +141,28 @@ function HomeContent() {
     setSelectedImage(pet)
     
     try {
-      // First get the current view count
-      const { data: currentPet, error: fetchError } = await supabase
+      // Use the database function to increment the view count
+      const { error: incrementError } = await supabase
+        .rpc('increment_view_count', { pet_id: pet.id })
+
+      if (incrementError) {
+        console.error('Error incrementing view count:', incrementError)
+        return
+      }
+
+      // Get the updated view count
+      const { data: updatedPet, error: fetchError } = await supabase
         .from('pet_uploads')
         .select('view_count')
         .eq('id', pet.id)
         .single()
 
       if (fetchError) {
-        console.error('Error fetching current view count:', fetchError)
+        console.error('Error fetching updated view count:', fetchError)
         return
       }
 
-      const currentCount = currentPet.view_count || 0
-      const newCount = currentCount + 1
-
-      // Update the database with the new count
-      const { error: updateError } = await supabase
-        .from('pet_uploads')
-        .update({ view_count: newCount })
-        .eq('id', pet.id)
-
-      if (updateError) {
-        console.error('Error updating view count:', updateError)
-        return
-      }
-
+      const newCount = updatedPet.view_count
       console.log('View count updated successfully for image:', pet.id, 'New count:', newCount)
       
       // Update local state with the new count
