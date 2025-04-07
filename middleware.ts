@@ -5,6 +5,11 @@ import type { NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   const requestUrl = new URL(request.url)
 
+  // Skip middleware for callback route
+  if (requestUrl.pathname.startsWith('/auth/callback')) {
+    return NextResponse.next()
+  }
+
   // Log all requests that pass through middleware
   console.log(`Middleware handling request to: ${requestUrl.pathname}`)
 
