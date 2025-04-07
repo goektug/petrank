@@ -189,6 +189,12 @@ function HomeContent() {
     handleImageClick(pet)
   }
 
+  // Add click handler for desktop devices
+  const handleClick = (e: React.MouseEvent, pet: PetImage) => {
+    e.preventDefault()
+    handleImageClick(pet)
+  }
+
   // If processing auth, show loading state
   if (isProcessingAuth) {
     return (
@@ -214,7 +220,7 @@ function HomeContent() {
         <div className="mb-8">
           <div 
             className="relative bg-white rounded-lg shadow-lg overflow-hidden cursor-pointer transform transition-transform hover:scale-105 mx-auto max-w-4xl"
-            onClick={() => handleImageClick(petImages[0])}
+            onClick={(e) => handleClick(e, petImages[0])}
           >
             {petImages[0].image_url ? (
               <div className="relative">
@@ -265,7 +271,7 @@ function HomeContent() {
             <div 
               key={pet.id} 
               className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer transform transition-transform hover:scale-105"
-              onClick={() => handleImageClick(pet)}
+              onClick={(e) => handleClick(e, pet)}
               onTouchStart={(e) => handleTouchStart(e, pet)}
               onTouchEnd={(e) => handleTouchEnd(e, pet)}
             >
