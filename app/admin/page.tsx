@@ -190,7 +190,7 @@ function AdminDashboard() {
                       <p>Views: {upload.view_count}</p>
                     )}
                     {upload.social_media_link && (
-                      <p className="mt-4">
+                      <p className="mt-4 text-center">
                         <a 
                           href={upload.social_media_link}
                           target="_blank"
