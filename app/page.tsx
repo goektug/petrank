@@ -182,18 +182,21 @@ function HomeContent() {
   // Add touch event handler for mobile devices
   const handleTouchStart = (e: React.TouchEvent, pet: PetImage) => {
     e.preventDefault() // Prevent default touch behavior
+    console.log('Touch start on image:', pet.id)
     handleImageClick(pet)
   }
 
   // Add touch end handler to ensure the event is processed
   const handleTouchEnd = (e: React.TouchEvent, pet: PetImage) => {
     e.preventDefault()
+    console.log('Touch end on image:', pet.id)
     handleImageClick(pet)
   }
 
   // Add click handler for desktop devices
   const handleClick = (e: React.MouseEvent, pet: PetImage) => {
     e.preventDefault()
+    console.log('Click on image:', pet.id)
     handleImageClick(pet)
   }
 
@@ -276,6 +279,7 @@ function HomeContent() {
               onClick={(e) => handleClick(e, pet)}
               onTouchStart={(e) => handleTouchStart(e, pet)}
               onTouchEnd={(e) => handleTouchEnd(e, pet)}
+              onTouchCancel={(e) => e.preventDefault()}
             >
               {pet.image_url ? (
                 <div className="relative">
