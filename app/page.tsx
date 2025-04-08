@@ -111,7 +111,7 @@ function HomeContent() {
   // Add a flag to control sorting behavior
   const USE_VIEW_COUNT_SORT = true; // Set to TRUE to use view count sorting
   
-  // Simplified fetch images function that always gets fresh data
+  // Simplified fetch images function that gets top image + random selection
   const fetchImages = async (page = 1) => {
     try {
       setIsLoading(true)
@@ -128,130 +128,149 @@ function HomeContent() {
       // Calculate offset
       const offset = (page - 1) * PAGE_SIZE
       
-      // Add a direct test query for images with view_count < 100
-      const { data: lowViewImages, error: lowViewError } = await supabase
-        .from('pet_uploads')
-        .select('id, pet_name, view_count')
-        .eq('status', 'approved')
-        .lt('view_count', 100) // Explicitly look for low view counts
-      
-      console.log(`Images with view_count < 100:`, lowViewImages?.length || 0)
-      if (lowViewImages && lowViewImages.length > 0) {
-        console.log(`Sample low view images:`, lowViewImages.slice(0, 3))
-      }
-      
-      // Get all approved images with configurable sorting
-      const query = supabase
-        .from('pet_uploads')
-        .select('id, pet_name, age, gender, social_media_link, file_path, view_count, created_at, image_url')
-        .eq('status', 'approved');
-      
-      // Apply sorting based on flag
-      if (USE_VIEW_COUNT_SORT) {
-        query
-          .order('view_count', { ascending: false, nullsFirst: false })
-          .order('created_at', { ascending: false });
-      } else {
-        // Use date-based sorting as a fallback to ensure all images appear
-        query.order('created_at', { ascending: false });
-      }
-      
-      // Apply pagination
-      const { data, error } = await query.range(offset, offset + PAGE_SIZE - 1);
-      
-      if (error) {
-        console.error('Error fetching pet images:', error)
-        setError('Failed to load pet images')
-        return
-      }
-
-      console.log('Raw data fetched:', data)
-
-      if (!data || data.length === 0) {
-        console.log('No approved images found for this page')
-        if (page === 1) {
-          setPetImages([])
-        }
-        setHasMore(false)
-        return
-      }
-
-      console.log(`Fetched ${data.length} images for page ${page}`)
-      data.forEach(pet => {
-        console.log(`Pet ${pet.id} (${pet.pet_name}) has view_count: ${pet.view_count === null ? 'NULL' : pet.view_count}`)
-      })
-      
-      // Initialize view_count as 0 for any null values
-      const processedData = data.map(pet => ({
-        ...pet,
-        view_count: typeof pet.view_count === 'number' ? pet.view_count : 0
-      }))
-
-      console.log('Processed data with view_count defaults:', processedData.map(p => 
-        `${p.pet_name}: ${p.view_count}`
-      ))
-
-      // Get cached image URLs in parallel
-      const petsWithUrls = await Promise.all(
-        processedData.map(async (pet) => {
-          // If the pet already has an image_url, use it directly
-          if (pet.image_url) {
-            return pet;
-          }
-          
-          // Otherwise, get a signed URL from storage
-          if (pet.file_path) {
-            const signedUrl = await getCachedImageUrl(pet.file_path, pet.id)
-            return { 
-              ...pet, 
-              image_url: signedUrl || pet.image_url || undefined
-            }
-          }
-          return pet
-        })
-      )
-
-      // Use a type assertion to tell TypeScript that all objects in petsWithUrls have the properties we expect
-      console.log('Final pet images with URLs:', (petsWithUrls as PetImage[]).map(p => 
-        `${p.pet_name}: ${p.view_count}, has URL: ${p.image_url ? 'yes' : 'no'}`
-      ))
-
-      // If first page, replace all images; otherwise append
+      // For first page, get top image separately 
       if (page === 1) {
+        // First get the top-ranked image by view count
+        const { data: topImage, error: topError } = await supabase
+          .from('pet_uploads')
+          .select('id, pet_name, age, gender, social_media_link, file_path, view_count, created_at, image_url')
+          .eq('status', 'approved')
+          .order('view_count', { ascending: false, nullsFirst: false })
+          .limit(1)
+        
+        if (topError) {
+          console.error('Error fetching top image:', topError)
+          return
+        }
+        
+        console.log('Top image:', topImage?.[0]?.pet_name, 'with view count:', topImage?.[0]?.view_count)
+        
+        // Get all approved images for random selection
+        const { data: allImages, error: allError } = await supabase
+          .from('pet_uploads')
+          .select('id, pet_name, age, gender, social_media_link, file_path, view_count, created_at, image_url')
+          .eq('status', 'approved')
+          .neq('id', topImage?.[0]?.id) // Exclude the top image
+          
+        if (allError) {
+          console.error('Error fetching all images for random selection:', allError)
+          return
+        }
+        
+        // Shuffle the remaining images for random selection
+        const shuffledImages = allImages ? shuffleArray([...allImages]) : []
+        
+        // Take only what we need for this page (PAGE_SIZE - 1, since we already have the top image)
+        const randomSelection = shuffledImages.slice(0, PAGE_SIZE - 1)
+        
+        // Combine top image with random selection
+        const data = topImage ? [...topImage, ...randomSelection] : randomSelection
+        
+        console.log(`Selected ${data.length} images (1 top + ${randomSelection.length} random)`)
+      
+        // Process the data as before...
+        if (!data || data.length === 0) {
+          console.log('No approved images found')
+          setPetImages([])
+          setHasMore(false)
+          return
+        }
+
+        console.log(`Fetched ${data.length} images for page ${page}`)
+        data.forEach(pet => {
+          console.log(`Pet ${pet.id} (${pet.pet_name}) has view_count: ${pet.view_count === null ? 'NULL' : pet.view_count}`)
+        })
+        
+        // Initialize view_count as 0 for any null values
+        const processedData = data.map(pet => ({
+          ...pet,
+          view_count: typeof pet.view_count === 'number' ? pet.view_count : 0
+        }))
+    
+        // Get cached image URLs in parallel
+        const petsWithUrls = await Promise.all(
+          processedData.map(async (pet) => {
+            // If the pet already has an image_url, use it directly
+            if (pet.image_url) {
+              return pet;
+            }
+            
+            // Otherwise, get a signed URL from storage
+            if (pet.file_path) {
+              const signedUrl = await getCachedImageUrl(pet.file_path, pet.id)
+              return { 
+                ...pet, 
+                image_url: signedUrl || pet.image_url || undefined
+              }
+            }
+            return pet
+          })
+        )
+    
+        // Set the images
         setPetImages(petsWithUrls as PetImage[])
       } else {
-        setPetImages(prevImages => [...prevImages, ...(petsWithUrls as PetImage[])])
-      }
-      
-      // Determine if there are more images to load
-      setHasMore(petsWithUrls.length === PAGE_SIZE && petsWithUrls.length + (page - 1) * PAGE_SIZE < totalCount)
-      setCurrentPage(page)
-
-      // Prefetch the next page of images
-      if (petsWithUrls.length === PAGE_SIZE && page * PAGE_SIZE < totalCount) {
-        const prefetchQuery = supabase
+        // For subsequent pages, just get random images
+        // Get all approved images for random selection
+        const { data: allImages, error: allError } = await supabase
           .from('pet_uploads')
-          .select('id, file_path')
-          .eq('status', 'approved');
-        
-        // Apply the same sorting logic
-        if (USE_VIEW_COUNT_SORT) {
-          prefetchQuery
-            .order('view_count', { ascending: false, nullsFirst: false })
-            .order('created_at', { ascending: false });
-        } else {
-          prefetchQuery.order('created_at', { ascending: false });
+          .select('id, pet_name, age, gender, social_media_link, file_path, view_count, created_at, image_url')
+          .eq('status', 'approved')
+          .not('id', 'in', petImages.map(p => p.id)) // Exclude already shown images
+          
+        if (allError) {
+          console.error('Error fetching images for additional pages:', allError)
+          return
         }
         
-        const { data: nextPageData } = await prefetchQuery.range(
-          offset + PAGE_SIZE, 
-          offset + PAGE_SIZE * 2 - 1
-        );
+        // Shuffle the remaining images for random selection
+        const shuffledImages = allImages ? shuffleArray([...allImages]) : []
         
-        if (nextPageData && nextPageData.length > 0) {
-          // Prefetch in background
-          prefetchImageUrls(nextPageData)
+        // Take only what we need for this page
+        const randomSelection = shuffledImages.slice(0, PAGE_SIZE)
+        
+        console.log(`Selected ${randomSelection.length} random images for page ${page}`)
+      
+        if (!randomSelection || randomSelection.length === 0) {
+          console.log('No more images found')
+          setHasMore(false)
+          return
         }
+
+        console.log(`Fetched ${randomSelection.length} images for page ${page}`)
+        
+        // Initialize view_count as 0 for any null values
+        const processedData = randomSelection.map(pet => ({
+          ...pet,
+          view_count: typeof pet.view_count === 'number' ? pet.view_count : 0
+        }))
+    
+        // Get cached image URLs in parallel
+        const petsWithUrls = await Promise.all(
+          processedData.map(async (pet) => {
+            // If the pet already has an image_url, use it directly
+            if (pet.image_url) {
+              return pet;
+            }
+            
+            // Otherwise, get a signed URL from storage
+            if (pet.file_path) {
+              const signedUrl = await getCachedImageUrl(pet.file_path, pet.id)
+              return { 
+                ...pet, 
+                image_url: signedUrl || pet.image_url || undefined
+              }
+            }
+            return pet
+          })
+        )
+    
+        // Update hasMore flag based on remaining images
+        setHasMore(randomSelection.length === PAGE_SIZE)
+        setCurrentPage(page)
+        
+        // Append the new images
+        setPetImages(prevImages => [...prevImages, ...(petsWithUrls as PetImage[])])
       }
     } catch (err) {
       console.error('Failed to fetch pet images:', err)
@@ -712,4 +731,14 @@ export default function Home() {
       <HomeContent />
     </Suspense>
   )
+}
+
+// Helper function to shuffle an array (Fisher-Yates algorithm)
+const shuffleArray = (array: any[]) => {
+  const result = [...array];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
 } 
