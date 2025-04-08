@@ -1,0 +1,5 @@
+[33mcommit 629bc82e2cf8604dcf02b24dcdc7bbfce3e19f16[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m
+Author: Goktug <goktugislamoglu@gmail.com>
+Date:   Tue Apr 8 12:37:10 2025 +0200
+
+    Fix: Sort images by created date instead of view count to show all approved images
