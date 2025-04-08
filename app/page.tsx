@@ -179,8 +179,9 @@ function HomeContent() {
         })
       )
 
-      console.log('Final pet images with URLs:', petsWithUrls.map(p => 
-        `${p.pet_name}: ${p.view_count}, has URL: ${!!p.image_url}`
+      // Use a type assertion to tell TypeScript that all objects in petsWithUrls have the properties we expect
+      console.log('Final pet images with URLs:', (petsWithUrls as PetImage[]).map(p => 
+        `${p.pet_name}: ${p.view_count}, has URL: ${p.image_url ? 'yes' : 'no'}`
       ))
 
       // If first page, replace all images; otherwise append
