@@ -50,9 +50,12 @@ class ViewCountBatcher {
     this.pendingViewCounts[petId] = (this.pendingViewCounts[petId] || 0) + 1;
     console.log(`Added view count for pet ${petId}, pending=${this.pendingViewCounts[petId]}`);
     
-    // Return the optimistic new count - useful for UI updates
-    const optimisticCount = this.getOptimisticCount(petId);
-    this.notifyListeners(petId, optimisticCount);
+    // Get the optimistic count and notify listeners when available
+    this.getOptimisticCount(petId).then(count => {
+      this.notifyListeners(petId, count);
+    }).catch(error => {
+      console.error("Error getting optimistic count:", error);
+    });
   }
 
   // Register a callback for updates

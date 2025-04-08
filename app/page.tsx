@@ -55,7 +55,7 @@ function HomeContent() {
     const refresh = searchParams.get('refresh')
     if (refresh === 'true') {
       console.log('Refresh parameter detected, forcing data refresh')
-      fetchImages(1, true)
+      fetchImages(1)
       
       // Remove the refresh parameter from the URL to prevent unnecessary refreshes
       const newUrl = new URL(window.location.href)
@@ -108,10 +108,8 @@ function HomeContent() {
     }
   }
 
-  // Modified to use caching and Image component
-  const fetchImages = async (page = 1, forceRefresh = false) => {
-    if (isLoading && !forceRefresh) return
-    
+  // Simplified fetch images function that always gets fresh data
+  const fetchImages = async (page = 1) => {
     try {
       setIsLoading(true)
       console.log(`Fetching images page ${page}, limit ${PAGE_SIZE}...`)
@@ -209,6 +207,14 @@ function HomeContent() {
       fetchImages(currentPage + 1)
     }
   }
+
+  // Always fetch images when component mounts
+  useEffect(() => {
+    if (!isProcessingAuth) {
+      // Always fetch from page 1 on initial load
+      fetchImages(1)
+    }
+  }, [isProcessingAuth])
 
   const handleFileDrop = (acceptedFiles: File[]) => {
     setUploadedFiles(acceptedFiles)
@@ -357,13 +363,6 @@ function HomeContent() {
     <main className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold">Pet Rank</h1>
-        <button 
-          onClick={() => fetchImages(1, true)}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition-colors"
-          disabled={isLoading}
-        >
-          {isLoading ? 'Refreshing...' : 'Refresh Images'}
-        </button>
       </div>
 
       {error && (
