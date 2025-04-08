@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, Suspense, useCallback } from 'react'
+import { useEffect, useState, Suspense, useCallback, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
@@ -74,6 +74,9 @@ const Notification = ({ message, subMessage, onClose }: { message: string; subMe
 };
 
 function HomeContent() {
+  // Track renders to debug continuous reloading
+  const renderCount = useRef(0);
+  const hasInitiallyLoaded = useRef(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [currentFile, setCurrentFile] = useState<File | null>(null)
@@ -96,15 +99,39 @@ function HomeContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  // Handle OAuth code if present in URL
+  // Increment the render count on each render
   useEffect(() => {
+    renderCount.current += 1;
+    console.log(`HomeContent render count: ${renderCount.current}`);
+    
+    // Enable this to help debug what's causing renders
+    console.log('Current state that might trigger renders:', {
+      isLoading,
+      isModalOpen,
+      petImagesLength: petImages.length,
+      hasSelectedImage: !!selectedImage,
+      isProcessingAuth
+    });
+    
+    // Return cleanup to check unmounts
+    return () => {
+      console.log('HomeContent unmounting');
+    };
+  });
+
+  // Handle OAuth code if present in URL - strict one-time execution
+  useEffect(() => {
+    if (hasInitiallyLoaded.current) {
+      console.log('Skipping initial load logic - already executed');
+      return;
+    }
+
     const runOnce = () => {
       // Save the current URL search params to avoid re-triggering this effect
       const code = searchParams.get('code')
       if (code) {
         console.log(`OAuth code detected: ${code.substring(0, 8)}...`)
         handleOAuthCode(code)
-        return true;
       }
 
       // Check for refresh parameter and force data refresh
@@ -116,10 +143,10 @@ function HomeContent() {
         const newUrl = new URL(window.location.href)
         newUrl.searchParams.delete('refresh')
         window.history.replaceState({}, '', newUrl)
-        return true;
       }
       
-      return false;
+      // Mark as loaded regardless of result
+      hasInitiallyLoaded.current = true;
     }
     
     // Only run the special URL parameter handling once
@@ -382,18 +409,27 @@ function HomeContent() {
 
   // Always fetch images when component mounts, but only once
   useEffect(() => {
+    // Skip if already loaded or currently loading
+    if (hasInitiallyLoaded.current || isLoading) {
+      console.log('Skipping fetchImages - already loaded or currently loading');
+      return;
+    }
+    
     let isMounted = true;
     
     if (!isProcessingAuth && isMounted) {
       // Always fetch from page 1 on initial load
-      console.log('Initial fetch of images')
-      fetchImages(1)
+      console.log('Initial fetch of images');
+      fetchImages(1);
+      
+      // Mark as loaded
+      hasInitiallyLoaded.current = true;
     }
     
     return () => {
       isMounted = false;
     };
-  }, [isProcessingAuth, fetchImages]); // Include fetchImages in dependencies
+  }, [isProcessingAuth, fetchImages, isLoading]); // Include fetchImages in dependencies
 
   const handleFileDrop = (acceptedFiles: File[]) => {
     setUploadedFiles(acceptedFiles)

@@ -9,6 +9,19 @@ interface CachedUrl {
 // In-memory cache to prevent repeated API calls during a single session
 const memoryCache: Record<string, { url: string, expires: number }> = {};
 
+// Debug flag - set to false to stop all logging
+const DEBUG_LOGGING = false;
+
+// Safe console log that won't cause rerenders in dev mode
+const safeLog = (message: string, ...args: any[]) => {
+  if (DEBUG_LOGGING) {
+    // Use an empty setTimeout to break call stack and prevent React dev mode rerenders
+    setTimeout(() => {
+      console.log(message, ...args);
+    }, 0);
+  }
+};
+
 // Check if a cached URL is expired
 const isUrlExpired = (cachedData: string): boolean => {
   try {
@@ -36,7 +49,7 @@ const getPublicImageUrl = (filePath: string, petId: string): string => {
       url: data.publicUrl,
       expires: Date.now() + (60 * 60 * 1000) // 1 hour
     };
-    console.log(`Using public URL for pet ${petId}`);
+    safeLog(`Using public URL for pet ${petId}`);
   }
   
   return data?.publicUrl || '';
@@ -77,7 +90,7 @@ export const getCachedImageUrl = async (
   if (cachedData && !isUrlExpired(cachedData)) {
     try {
       const data = JSON.parse(cachedData) as CachedUrl;
-      console.log(`Using cached image URL for pet ${petId}, expires in ${Math.round((data.expires - Date.now()) / 1000 / 60)} minutes`);
+      safeLog(`Using cached image URL for pet ${petId}, expires in ${Math.round((data.expires - Date.now()) / 1000 / 60)} minutes`);
       
       // Update memory cache with localStorage value
       memoryCache[memoryCacheKey] = {
@@ -87,14 +100,14 @@ export const getCachedImageUrl = async (
       
       return data.url;
     } catch (e) {
-      console.error('Error parsing cached URL:', e);
+      safeLog('Error parsing cached URL:', e);
     }
   }
   
   // If not in cache or expired, get fresh URL
   try {
     const supabase = createClientComponentClient();
-    console.log(`Getting fresh signed URL for pet ${petId}`);
+    safeLog(`Getting fresh signed URL for pet ${petId}`);
     
     const { data, error } = await supabase.storage
       .from('pet-images')
@@ -104,7 +117,7 @@ export const getCachedImageUrl = async (
       );
       
     if (error || !data?.signedUrl) {
-      console.error('Error getting signed URL:', error);
+      safeLog('Error getting signed URL:', error);
       return null;
     }
     
@@ -123,7 +136,7 @@ export const getCachedImageUrl = async (
     
     return data.signedUrl;
   } catch (err) {
-    console.error('Failed to get signed URL:', err);
+    safeLog('Failed to get signed URL:', err);
     return null;
   }
 };
