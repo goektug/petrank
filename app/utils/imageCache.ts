@@ -6,6 +6,9 @@ interface CachedUrl {
   expires: number;
 }
 
+// In-memory cache to prevent repeated API calls during a single session
+const memoryCache: Record<string, { url: string, expires: number }> = {};
+
 // Check if a cached URL is expired
 const isUrlExpired = (cachedData: string): boolean => {
   try {
@@ -17,9 +20,25 @@ const isUrlExpired = (cachedData: string): boolean => {
 };
 
 // Get a direct public URL (not signed) which is more compatible with Next.js Image
-const getPublicImageUrl = (filePath: string): string => {
+const getPublicImageUrl = (filePath: string, petId: string): string => {
+  // Check in-memory cache first to prevent repeated calls during the same session
+  const memoryCacheKey = `public_${petId}`;
+  if (memoryCache[memoryCacheKey] && Date.now() < memoryCache[memoryCacheKey].expires) {
+    return memoryCache[memoryCacheKey].url;
+  }
+  
   const supabase = createClientComponentClient();
   const { data } = supabase.storage.from('pet-images').getPublicUrl(filePath);
+  
+  if (data?.publicUrl) {
+    // Store in memory cache for 1 hour
+    memoryCache[memoryCacheKey] = {
+      url: data.publicUrl,
+      expires: Date.now() + (60 * 60 * 1000) // 1 hour
+    };
+    console.log(`Using public URL for pet ${petId}`);
+  }
+  
   return data?.publicUrl || '';
 };
 
@@ -32,16 +51,26 @@ export const getCachedImageUrl = async (
   if (typeof window === 'undefined') {
     return null; // Return null during SSR
   }
+  
+  // Check in-memory cache first (fastest)
+  const memoryCacheKey = `mem_${petId}`;
+  if (memoryCache[memoryCacheKey] && Date.now() < memoryCache[memoryCacheKey].expires) {
+    return memoryCache[memoryCacheKey].url;
+  }
 
   // First try to generate a direct public URL (not signed)
   // This is more compatible with Next.js Image component
-  const publicUrl = getPublicImageUrl(filePath);
+  const publicUrl = getPublicImageUrl(filePath, petId);
   if (publicUrl) {
-    console.log(`Using public URL for pet ${petId}`);
+    // Cache the public URL in memory to reduce logging noise
+    memoryCache[memoryCacheKey] = {
+      url: publicUrl,
+      expires: Date.now() + (expiryHours * 60 * 60 * 1000)
+    };
     return publicUrl;
   }
 
-  // If public URL fails, try to get from localStorage first
+  // If public URL fails, try to get from localStorage
   const cacheKey = `pet_image_${petId}`;
   const cachedData = localStorage.getItem(cacheKey);
   
@@ -49,6 +78,13 @@ export const getCachedImageUrl = async (
     try {
       const data = JSON.parse(cachedData) as CachedUrl;
       console.log(`Using cached image URL for pet ${petId}, expires in ${Math.round((data.expires - Date.now()) / 1000 / 60)} minutes`);
+      
+      // Update memory cache with localStorage value
+      memoryCache[memoryCacheKey] = {
+        url: data.url,
+        expires: data.expires
+      };
+      
       return data.url;
     } catch (e) {
       console.error('Error parsing cached URL:', e);
@@ -72,12 +108,18 @@ export const getCachedImageUrl = async (
       return null;
     }
     
-    // Store URL with expiration
+    // Store URL in both caches
     const expiryTime = Date.now() + expiryHours * 60 * 60 * 1000;
+    
     localStorage.setItem(
       cacheKey,
       JSON.stringify({ url: data.signedUrl, expires: expiryTime })
     );
+    
+    memoryCache[memoryCacheKey] = {
+      url: data.signedUrl,
+      expires: expiryTime
+    };
     
     return data.signedUrl;
   } catch (err) {

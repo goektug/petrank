@@ -98,24 +98,32 @@ function HomeContent() {
 
   // Handle OAuth code if present in URL
   useEffect(() => {
-    // Save the current URL search params to a ref to avoid re-triggering this effect
-    const code = searchParams.get('code')
-    if (code) {
-      console.log(`OAuth code detected: ${code.substring(0, 8)}...`)
-      handleOAuthCode(code)
-    }
+    const runOnce = () => {
+      // Save the current URL search params to avoid re-triggering this effect
+      const code = searchParams.get('code')
+      if (code) {
+        console.log(`OAuth code detected: ${code.substring(0, 8)}...`)
+        handleOAuthCode(code)
+        return true;
+      }
 
-    // Check for refresh parameter and force data refresh
-    const refresh = searchParams.get('refresh')
-    if (refresh === 'true') {
-      console.log('Refresh parameter detected, forcing data refresh')
-      fetchImages(1)
+      // Check for refresh parameter and force data refresh
+      const refresh = searchParams.get('refresh')
+      if (refresh === 'true') {
+        console.log('Refresh parameter detected, forcing data refresh')
+        
+        // Remove the refresh parameter from the URL to prevent unnecessary refreshes
+        const newUrl = new URL(window.location.href)
+        newUrl.searchParams.delete('refresh')
+        window.history.replaceState({}, '', newUrl)
+        return true;
+      }
       
-      // Remove the refresh parameter from the URL to prevent unnecessary refreshes
-      const newUrl = new URL(window.location.href)
-      newUrl.searchParams.delete('refresh')
-      window.history.replaceState({}, '', newUrl)
+      return false;
     }
+    
+    // Only run the special URL parameter handling once
+    runOnce();
   }, []); // Empty dependency array - only run once on mount
 
   const handleOAuthCode = async (code: string) => {
@@ -142,8 +150,8 @@ function HomeContent() {
     }
   }
 
-  // Get total count of approved images
-  const fetchTotalCount = async () => {
+  // Get total count of approved images - moved outside fetchImages to simplify
+  const fetchTotalCount = useCallback(async () => {
     try {
       const { count, error } = await supabase
         .from('pet_uploads')
@@ -160,14 +168,20 @@ function HomeContent() {
       console.error('Failed to fetch total count:', err)
       return 0
     }
-  }
+  }, [supabase]);
 
   // Add a flag to control sorting behavior
   const USE_VIEW_COUNT_SORT = true; // Set to TRUE to use view count sorting
   
-  // Simplified fetch images function that gets top image + random selection
-  const fetchImages = async (page = 1) => {
+  // Convert to useCallback to prevent recreation on every render
+  const fetchImages = useCallback(async (page = 1) => {
     try {
+      // Don't refetch if already loading
+      if (isLoading) {
+        console.log('Already loading, skipping fetch');
+        return;
+      }
+      
       setIsLoading(true)
       console.log(`Fetching images page ${page}, limit ${PAGE_SIZE}...`)
       
@@ -346,7 +360,18 @@ function HomeContent() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [
+    isLoading, 
+    totalCount, 
+    fetchTotalCount, 
+    PAGE_SIZE,
+    setIsLoading,
+    setTotalCount,
+    setHasMore,
+    setError,
+    supabase,
+    setPetImages
+  ]);
 
   // Load more images when user clicks "Load More"
   const loadMoreImages = () => {
@@ -368,7 +393,7 @@ function HomeContent() {
     return () => {
       isMounted = false;
     };
-  }, [isProcessingAuth]); // Only re-run if auth status changes
+  }, [isProcessingAuth, fetchImages]); // Include fetchImages in dependencies
 
   const handleFileDrop = (acceptedFiles: File[]) => {
     setUploadedFiles(acceptedFiles)
