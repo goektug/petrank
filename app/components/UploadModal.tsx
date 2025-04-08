@@ -115,6 +115,17 @@ export default function UploadModal({ onClose, file }: UploadModalProps) {
         throw uploadError
       }
       
+      // Get a public URL for the uploaded image
+      const { data: publicUrlData } = await supabase.storage
+        .from('pet-images')
+        .getPublicUrl(filePath)
+        
+      const imageUrl = publicUrlData?.publicUrl
+      
+      if (!imageUrl) {
+        throw new Error('Failed to generate public URL for the image')
+      }
+      
       // Insert metadata into database
       const { error: insertError } = await supabase
         .from('pet_uploads')
@@ -125,6 +136,7 @@ export default function UploadModal({ onClose, file }: UploadModalProps) {
           gender,
           social_media_link: socialMediaLink || null,
           file_path: filePath,
+          image_url: imageUrl,
           status: 'pending',
           view_count: 0
         })
