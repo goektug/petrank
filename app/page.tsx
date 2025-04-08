@@ -450,43 +450,46 @@ function HomeContent() {
             className="bg-white rounded-lg max-w-4xl w-full overflow-hidden relative mx-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="relative">
-              <img
-                key={selectedImage.id}
-                src={selectedImage.image_url}
-                alt={selectedImage.pet_name}
-                className="w-full max-h-[80vh] object-contain bg-black"
-              />
-              <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded">
-                👁 {selectedImage.view_count || 0} views
-              </div>
-            </div>
-            <div className="p-6">
-              <h2 className="text-2xl font-bold mb-2">{selectedImage.pet_name}</h2>
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <p className="text-gray-600">Age: {selectedImage.age}</p>
-                  <p className="text-gray-600">Gender: {selectedImage.gender}</p>
+            {/* Force a complete rerender of the entire modal content when image changes */}
+            <div key={`modal-content-${selectedImage.id}`} className="modal-content">
+              <div className="relative">
+                <img
+                  key={selectedImage.id}
+                  src={selectedImage.image_url}
+                  alt={selectedImage.pet_name}
+                  className="w-full max-h-[80vh] object-contain bg-black"
+                />
+                <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded">
+                  👁 {selectedImage.view_count || 0} views
                 </div>
-                {selectedImage.social_media_link && (
-                  <div className="text-right">
-                    <a 
-                      href={selectedImage.social_media_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
-                    >
-                      Social Media
-                    </a>
-                  </div>
-                )}
               </div>
-              <button
-                onClick={() => { setSelectedImage(null); setSelectedImageIndex(null); }}
-                className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded mt-4"
-              >
-                Close
-              </button>
+              <div className="p-6">
+                <h2 className="text-2xl font-bold mb-2">{selectedImage.pet_name}</h2>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <p key={`age-${selectedImage.id}`} className="text-gray-600">Age: {selectedImage.age}</p>
+                    <p key={`gender-${selectedImage.id}`} className="text-gray-600">Gender: {selectedImage.gender}</p>
+                  </div>
+                  {selectedImage.social_media_link && (
+                    <div key={`social-${selectedImage.id}`} className="text-right">
+                      <a 
+                        href={selectedImage.social_media_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        Social Media
+                      </a>
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => { setSelectedImage(null); setSelectedImageIndex(null); }}
+                  className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded mt-4"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
 
