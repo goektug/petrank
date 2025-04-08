@@ -133,12 +133,34 @@ function HomeContent() {
       
       console.log(`Total number of approved images with any view count: ${anyViewCount}`)
       
-      // Get all approved images sorted by created date if nothing else works
+      // Query with order by created_at
+      const { data: dataByDate, error: errorByDate } = await supabase
+        .from('pet_uploads')
+        .select('id, pet_name, view_count, created_at')
+        .eq('status', 'approved')
+        .order('created_at', { ascending: false })
+        
+      console.log('Images sorted by date:', dataByDate?.map(p => 
+        `${p.pet_name}: view_count=${p.view_count || 'NULL'}, created=${new Date(p.created_at).toLocaleDateString()}`
+      ))
+        
+      // Query with order by view_count
+      const { data: dataByViews, error: errorByViews } = await supabase
+        .from('pet_uploads')
+        .select('id, pet_name, view_count, created_at')
+        .eq('status', 'approved')
+        .order('view_count', { ascending: false, nullsFirst: false })
+        
+      console.log('Images sorted by view count:', dataByViews?.map(p => 
+        `${p.pet_name}: view_count=${p.view_count || 'NULL'}, created=${new Date(p.created_at).toLocaleDateString()}`
+      ))
+      
+      // Get all approved images sorted properly by view count
       const { data, error } = await supabase
         .from('pet_uploads')
         .select('id, pet_name, age, gender, social_media_link, file_path, view_count, created_at, image_url')
         .eq('status', 'approved')
-        .order('created_at', { ascending: false }) // Sort by newest first instead of view_count
+        .order('view_count', { ascending: false, nullsFirst: false }) // Put NULLs at the end
         .range(offset, offset + PAGE_SIZE - 1)
       
       if (error) {
@@ -215,7 +237,7 @@ function HomeContent() {
           .from('pet_uploads')
           .select('id, file_path')
           .eq('status', 'approved')
-          .order('created_at', { ascending: false }) // Match the main query's ordering
+          .order('view_count', { ascending: false, nullsFirst: false }) // Match the main query's ordering
           .range(offset + PAGE_SIZE, offset + PAGE_SIZE * 2 - 1)
         
         if (nextPageData && nextPageData.length > 0) {
