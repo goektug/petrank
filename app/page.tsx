@@ -211,66 +211,80 @@ function HomeContent() {
         setPetImages(petsWithUrls as PetImage[])
       } else {
         // For subsequent pages, just get random images
-        // Get all approved images for random selection
-        const { data: allImages, error: allError } = await supabase
-          .from('pet_uploads')
-          .select('id, pet_name, age, gender, social_media_link, file_path, view_count, created_at, image_url')
-          .eq('status', 'approved')
-          .not('id', 'in', petImages.map(p => p.id)) // Exclude already shown images
-          
-        if (allError) {
-          console.error('Error fetching images for additional pages:', allError)
-          return
-        }
-        
-        // Shuffle the remaining images for random selection
-        const shuffledImages = allImages ? shuffleArray([...allImages]) : []
-        
-        // Take only what we need for this page
-        const randomSelection = shuffledImages.slice(0, PAGE_SIZE)
-        
-        console.log(`Selected ${randomSelection.length} random images for page ${page}`)
-      
-        if (!randomSelection || randomSelection.length === 0) {
-          console.log('No more images found')
-          setHasMore(false)
-          return
-        }
-
-        console.log(`Fetched ${randomSelection.length} images for page ${page}`)
-        
-        // Initialize view_count as 0 for any null values
-        const processedData = randomSelection.map(pet => ({
-          ...pet,
-          view_count: typeof pet.view_count === 'number' ? pet.view_count : 0
-        }))
-    
-        // Get cached image URLs in parallel
-        const petsWithUrls = await Promise.all(
-          processedData.map(async (pet) => {
-            // If the pet already has an image_url, use it directly
-            if (pet.image_url) {
-              return pet;
-            }
+        try {
+          // Get all approved images without trying to exclude using 'not in' which causes SQL errors
+          const { data: allImages, error: allError } = await supabase
+            .from('pet_uploads')
+            .select('id, pet_name, age, gender, social_media_link, file_path, view_count, created_at, image_url')
+            .eq('status', 'approved')
             
-            // Otherwise, get a signed URL from storage
-            if (pet.file_path) {
-              const signedUrl = await getCachedImageUrl(pet.file_path, pet.id)
-              return { 
-                ...pet, 
-                image_url: signedUrl || pet.image_url || undefined
+          if (allError) {
+            console.error('Error fetching images for additional pages:', allError)
+            return
+          }
+          
+          if (!allImages || allImages.length === 0) {
+            console.log('No more images found')
+            setHasMore(false)
+            return
+          }
+          
+          // Filter out already shown images on the client side
+          const alreadyShownIds = new Set(petImages.map(p => p.id))
+          const remainingImages = allImages.filter(img => !alreadyShownIds.has(img.id))
+          
+          console.log(`Filtered ${allImages.length} total images to ${remainingImages.length} remaining images`)
+          
+          if (remainingImages.length === 0) {
+            console.log('No new images to show')
+            setHasMore(false)
+            return
+          }
+          
+          // Shuffle the remaining images for random selection
+          const shuffledImages = shuffleArray([...remainingImages])
+          
+          // Take only what we need for this page
+          const randomSelection = shuffledImages.slice(0, PAGE_SIZE)
+          
+          console.log(`Selected ${randomSelection.length} random images for page ${page}`)
+          
+          // Initialize view_count as 0 for any null values
+          const processedData = randomSelection.map(pet => ({
+            ...pet,
+            view_count: typeof pet.view_count === 'number' ? pet.view_count : 0
+          }))
+      
+          // Get cached image URLs in parallel
+          const petsWithUrls = await Promise.all(
+            processedData.map(async (pet) => {
+              // If the pet already has an image_url, use it directly
+              if (pet.image_url) {
+                return pet;
               }
-            }
-            return pet
-          })
-        )
-    
-        // Update hasMore flag based on remaining images
-        setHasMore(randomSelection.length === PAGE_SIZE)
-        setCurrentPage(page)
-        
-        // Append the new images
-        setPetImages(prevImages => [...prevImages, ...(petsWithUrls as PetImage[])])
+              
+              // Otherwise, get a signed URL from storage
+              if (pet.file_path) {
+                const signedUrl = await getCachedImageUrl(pet.file_path, pet.id)
+                return { 
+                  ...pet, 
+                  image_url: signedUrl || pet.image_url || undefined
+                }
+              }
+              return pet
+            })
+          )
+      
+          // Update hasMore flag based on remaining images
+          setHasMore(remainingImages.length > randomSelection.length)
+          setCurrentPage(page)
+          
+          // Append the new images
+          setPetImages(prevImages => [...prevImages, ...(petsWithUrls as PetImage[])])
+        } catch (err) {
+          console.error('Error in pagination:', err)
+          setError('Failed to load more images')
+        }
       }
     } catch (err) {
       console.error('Failed to fetch pet images:', err)
