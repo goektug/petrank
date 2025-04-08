@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, Suspense } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
@@ -261,6 +261,22 @@ function AdminDashboard() {
   )
 }
 
+// Add a loading component for Suspense fallback
+function AdminLoading() {
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        <span className="ml-2">Loading admin panel...</span>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPage() {
-  return <AdminDashboard />
+  return (
+    <Suspense fallback={<AdminLoading />}>
+      <AdminDashboard />
+    </Suspense>
+  )
 } 
