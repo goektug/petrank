@@ -117,6 +117,7 @@ function HomeContent() {
       // Get total count for pagination
       if (page === 1 || totalCount === 0) {
         const count = await fetchTotalCount()
+        console.log(`Total approved images count: ${count}`)
         setTotalCount(count)
         setHasMore(count > PAGE_SIZE * (page - 1))
       }
@@ -124,11 +125,12 @@ function HomeContent() {
       // Calculate offset
       const offset = (page - 1) * PAGE_SIZE
       
+      // Get all approved images without filtering by view_count
       const { data, error } = await supabase
         .from('pet_uploads')
         .select('id, pet_name, age, gender, social_media_link, file_path, view_count, created_at')
         .eq('status', 'approved')
-        .order('view_count', { ascending: false })
+        .order('view_count', { ascending: false, nullsFirst: false }) // nullsFirst: false puts nulls last
         .range(offset, offset + PAGE_SIZE - 1)
       
       if (error) {
@@ -136,6 +138,8 @@ function HomeContent() {
         setError('Failed to load pet images')
         return
       }
+
+      console.log('Raw data fetched:', data)
 
       if (!data || data.length === 0) {
         console.log('No approved images found for this page')
@@ -147,12 +151,19 @@ function HomeContent() {
       }
 
       console.log(`Fetched ${data.length} images for page ${page}`)
+      data.forEach(pet => {
+        console.log(`Pet ${pet.id} (${pet.pet_name}) has view_count: ${pet.view_count === null ? 'NULL' : pet.view_count}`)
+      })
       
       // Initialize view_count as 0 for any null values
       const processedData = data.map(pet => ({
         ...pet,
         view_count: typeof pet.view_count === 'number' ? pet.view_count : 0
       }))
+
+      console.log('Processed data with view_count defaults:', processedData.map(p => 
+        `${p.pet_name}: ${p.view_count}`
+      ))
 
       // Get cached image URLs in parallel
       const petsWithUrls = await Promise.all(
@@ -167,6 +178,10 @@ function HomeContent() {
           return pet
         })
       )
+
+      console.log('Final pet images with URLs:', petsWithUrls.map(p => 
+        `${p.pet_name}: ${p.view_count}, has URL: ${!!p.image_url}`
+      ))
 
       // If first page, replace all images; otherwise append
       if (page === 1) {
@@ -185,7 +200,7 @@ function HomeContent() {
           .from('pet_uploads')
           .select('id, file_path')
           .eq('status', 'approved')
-          .order('view_count', { ascending: false })
+          .order('view_count', { ascending: false, nullsFirst: false })
           .range(offset + PAGE_SIZE, offset + PAGE_SIZE * 2 - 1)
         
         if (nextPageData && nextPageData.length > 0) {
