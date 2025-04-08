@@ -28,6 +28,8 @@ function HomeContent() {
   const [selectedImage, setSelectedImage] = useState<PetImage | null>(null)
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null)
   const [isProcessingAuth, setIsProcessingAuth] = useState(false)
+  const [touchStartPos, setTouchStartPos] = useState<{x: number, y: number} | null>(null)
+  const [clickStartTime, setClickStartTime] = useState<number>(0)
   const supabase = createClientComponentClient()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -208,24 +210,63 @@ function HomeContent() {
     }
   }
 
-  // Add touch event handler for mobile devices
+  // Modified touch event handler for mobile devices
   const handleTouchStart = (e: React.TouchEvent, pet: PetImage) => {
-    console.log('Touch start on image:', pet.id)
+    // Record touch start position
+    const touch = e.touches[0];
+    setTouchStartPos({ x: touch.clientX, y: touch.clientY });
+    setClickStartTime(Date.now());
     // Don't call handleImageClick here - wait for touch end
   }
 
-  // Add touch end handler to ensure the event is processed
+  // Modified touch end handler with movement detection
   const handleTouchEnd = (e: React.TouchEvent, pet: PetImage, index: number) => {
-    e.preventDefault()
-    console.log('Touch end on image:', pet.id, 'at index:', index)
-    handleImageClick(pet, index)
+    e.preventDefault(); // Prevent default behavior
+    
+    if (!touchStartPos) return; // Safeguard
+    
+    // Calculate touch movement distance
+    const touch = e.changedTouches[0];
+    const touchEndPos = { x: touch.clientX, y: touch.clientY };
+    const distanceX = Math.abs(touchEndPos.x - touchStartPos.x);
+    const distanceY = Math.abs(touchEndPos.y - touchStartPos.y);
+    const timeElapsed = Date.now() - clickStartTime;
+    
+    // Clear touch tracking state
+    setTouchStartPos(null);
+    
+    // Only treat as a tap if:
+    // 1. Movement was minimal (less than 10px in any direction)
+    // 2. Touch duration was short (less than 300ms)
+    const isDeliberateTap = distanceX < 10 && distanceY < 10 && timeElapsed < 300;
+    
+    if (isDeliberateTap) {
+      console.log('Deliberate tap detected on image:', pet.id, 'at index:', index);
+      handleImageClick(pet, index);
+    } else {
+      console.log('Scroll motion detected, ignoring tap');
+    }
   }
 
-  // Add click handler for desktop devices
+  // Modified click handler for desktop devices with similar detection
   const handleClick = (e: React.MouseEvent, pet: PetImage, index: number) => {
-    e.preventDefault()
-    console.log('Click on image:', pet.id, 'at index:', index)
-    handleImageClick(pet, index)
+    // For desktop, we'll just check if it was a quick click
+    // This helps avoid accidental clicks when trying to select text or perform other actions
+    const timeElapsed = Date.now() - clickStartTime;
+    const isDeliberateClick = timeElapsed < 300; // Clicks typically very fast
+    
+    if (isDeliberateClick) {
+      console.log('Deliberate click detected on image:', pet.id, 'at index:', index);
+      e.preventDefault(); // Prevent default only for deliberate clicks
+      handleImageClick(pet, index);
+    } else {
+      console.log('Slow/accidental click detected, ignoring');
+    }
+  }
+
+  // Add mouse down handler to track click start time (for desktop)
+  const handleMouseDown = () => {
+    setClickStartTime(Date.now());
   }
 
   // --- Navigation Functions ---
@@ -273,9 +314,10 @@ function HomeContent() {
           <div 
             className="relative bg-white rounded-lg shadow-lg overflow-hidden cursor-pointer transform transition-transform hover:scale-105 mx-auto max-w-4xl"
             onClick={(e) => handleClick(e, petImages[0], 0)}
+            onMouseDown={handleMouseDown}
             onTouchStart={(e) => handleTouchStart(e, petImages[0])}
             onTouchEnd={(e) => handleTouchEnd(e, petImages[0], 0)}
-            onTouchCancel={(e) => e.preventDefault()}
+            onTouchCancel={() => setTouchStartPos(null)} // Clear on touch cancel
           >
             {petImages[0].image_url ? (
               <div className="relative">
@@ -329,9 +371,10 @@ function HomeContent() {
               key={pet.id} 
               className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer transform transition-transform hover:scale-105"
               onClick={(e) => handleClick(e, pet, originalIndex)}
+              onMouseDown={handleMouseDown}
               onTouchStart={(e) => handleTouchStart(e, pet)}
               onTouchEnd={(e) => handleTouchEnd(e, pet, originalIndex)}
-              onTouchCancel={(e) => e.preventDefault()}
+              onTouchCancel={() => setTouchStartPos(null)} // Clear on touch cancel
             >
               {pet.image_url ? (
                 <div className="relative">
