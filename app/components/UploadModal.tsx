@@ -7,9 +7,10 @@ import { v4 as uuidv4 } from 'uuid'
 interface UploadModalProps {
   onClose: () => void
   file: File
+  onSuccess?: () => void
 }
 
-export default function UploadModal({ onClose, file }: UploadModalProps) {
+export default function UploadModal({ onClose, file, onSuccess }: UploadModalProps) {
   const [petName, setPetName] = useState('')
   const [age, setAge] = useState('')
   const [gender, setGender] = useState('Male')
@@ -145,6 +146,11 @@ export default function UploadModal({ onClose, file }: UploadModalProps) {
         throw insertError
       }
       
+      // Call onSuccess if provided to notify parent component
+      if (onSuccess) {
+        onSuccess()
+      }
+      
       setSuccess(true)
       setTimeout(onClose, 2000)
       
@@ -176,7 +182,10 @@ export default function UploadModal({ onClose, file }: UploadModalProps) {
           <div className="text-center py-8">
             <div className="text-green-500 text-5xl mb-3">✓</div>
             <p className="text-lg font-medium">Upload Successful!</p>
-            <p className="text-gray-500 mt-1">Your pet photo is being reviewed.</p>
+            <div className="mt-4 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-md">
+              <p className="text-blue-700 font-medium">Your pet's image is waiting approval</p>
+              <p className="text-blue-600 text-sm mt-1">We'll review your submission shortly.</p>
+            </div>
           </div>
         ) : (
           <>
