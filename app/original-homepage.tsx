@@ -276,11 +276,12 @@ export default function Home() {
         </div>
       )}
 
-      <UploadModal
-        isOpen={isModalOpen}
-        onClose={handleModalClose}
-        initialFile={currentFile}
-      />
+      {isModalOpen && currentFile && (
+        <UploadModal
+          onClose={handleModalClose}
+          file={currentFile}
+        />
+      )}
     </main>
   )
 } 
