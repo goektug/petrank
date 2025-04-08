@@ -169,6 +169,7 @@ function AdminDashboard() {
                       alt={upload.pet_name} 
                       fill
                       unoptimized={true}
+                      loading="lazy"
                       sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                       className="object-cover rounded-lg"
                       onError={async () => {

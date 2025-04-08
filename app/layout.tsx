@@ -17,6 +17,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        {/* Add preconnect for Supabase image hosting */}
+        <link rel="preconnect" href="https://cblsslcreohsrhnurfev.supabase.co" />
+        <link rel="dns-prefetch" href="https://cblsslcreohsrhnurfev.supabase.co" />
+      </head>
       <body className={inter.className}>
         <main className="min-h-screen bg-gray-100">
           {children}

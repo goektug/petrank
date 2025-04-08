@@ -583,6 +583,7 @@ function HomeContent() {
                     unoptimized={true}
                     sizes="(max-width: 768px) 100vw, 1200px"
                     priority={true}
+                    loading="eager"
                     className="object-cover"
                     onError={async () => {
                       if (petImages[0].file_path) {
@@ -647,6 +648,7 @@ function HomeContent() {
                           fill
                           unoptimized={true}
                           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                          loading="lazy"
                           className="object-cover"
                           onError={async () => {
                             if (pet.file_path) {
@@ -755,6 +757,7 @@ function HomeContent() {
                       fill
                       unoptimized={true}
                       sizes="80vw"
+                      loading="eager"
                       className="object-contain"
                       onError={async () => {
                         if (selectedImage.file_path) {
