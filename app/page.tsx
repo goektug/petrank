@@ -30,6 +30,12 @@ function HomeContent() {
   const [isProcessingAuth, setIsProcessingAuth] = useState(false)
   const [touchStartPos, setTouchStartPos] = useState<{x: number, y: number} | null>(null)
   const [clickStartTime, setClickStartTime] = useState<number>(0)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [isLoading, setIsLoading] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [totalCount, setTotalCount] = useState(0)
+  const PAGE_SIZE = 10
+  
   const supabase = createClientComponentClient()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -46,7 +52,12 @@ function HomeContent() {
     const refresh = searchParams.get('refresh')
     if (refresh === 'true') {
       console.log('Refresh parameter detected, forcing data refresh')
-      fetchImages()
+      fetchImages(1, true)
+      
+      // Remove the refresh parameter from the URL to prevent unnecessary refreshes
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('refresh')
+      window.history.replaceState({}, '', newUrl)
     }
   }, [searchParams])
 
@@ -78,7 +89,7 @@ function HomeContent() {
     try {
       const { data, error } = await supabase.storage.from('pet-images').createSignedUrl(
         filePath, 
-        60 * 60 // 1 hour
+        15 * 60 // 15 minutes instead of 1 hour
       )
       if (error) {
         console.error('Error getting signed URL:', error)
@@ -91,16 +102,50 @@ function HomeContent() {
     }
   }
 
-  // Move fetchImages out of the useEffect to make it callable from other places
-  const fetchImages = async () => {
+  // Get total count of approved images
+  const fetchTotalCount = async () => {
     try {
-      console.log('Fetching images from database...')
+      const { count, error } = await supabase
+        .from('pet_uploads')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'approved')
+        
+      if (error) {
+        console.error('Error fetching total count:', error)
+        return 0
+      }
+      
+      return count || 0
+    } catch (err) {
+      console.error('Failed to fetch total count:', err)
+      return 0
+    }
+  }
+
+  // Paginated fetch function
+  const fetchImages = async (page = 1, forceRefresh = false) => {
+    if (isLoading && !forceRefresh) return
+    
+    try {
+      setIsLoading(true)
+      console.log(`Fetching images page ${page}, limit ${PAGE_SIZE}...`)
+      
+      // Get total count for pagination
+      if (page === 1 || totalCount === 0) {
+        const count = await fetchTotalCount()
+        setTotalCount(count)
+        setHasMore(count > PAGE_SIZE * (page - 1))
+      }
+      
+      // Calculate offset
+      const offset = (page - 1) * PAGE_SIZE
+      
       const { data, error } = await supabase
         .from('pet_uploads')
-        .select('*')
+        .select('id, pet_name, age, gender, social_media_link, file_path, view_count, created_at')
         .eq('status', 'approved')
         .order('view_count', { ascending: false })
-        .limit(50) // Limit to reasonable number of images
+        .range(offset, offset + PAGE_SIZE - 1)
       
       if (error) {
         console.error('Error fetching pet images:', error)
@@ -109,12 +154,15 @@ function HomeContent() {
       }
 
       if (!data || data.length === 0) {
-        console.log('No approved images found')
-        setPetImages([])
+        console.log('No approved images found for this page')
+        if (page === 1) {
+          setPetImages([])
+        }
+        setHasMore(false)
         return
       }
 
-      console.log('Raw data from database:', data)
+      console.log(`Fetched ${data.length} images for page ${page}`)
       
       // Initialize view_count as 0 for any null values
       const processedData = data.map(pet => ({
@@ -122,52 +170,44 @@ function HomeContent() {
         view_count: typeof pet.view_count === 'number' ? pet.view_count : 0
       }))
 
-      // Log each pet's view count for debugging
-      processedData.forEach(pet => {
-        console.log(`Pet ${pet.pet_name} (${pet.id}): view_count = ${pet.view_count}`)
-      })
-
-      // Sort by view_count descending
-      processedData.sort((a, b) => b.view_count - a.view_count)
-      
-      console.log('Processed data with view counts:', processedData)
-
+      // Get signed URLs only for visible images
       const petsWithUrls = await Promise.all(
         processedData.map(async (pet) => {
           if (pet.file_path) {
             const signedUrl = await getSignedUrl(pet.file_path)
             return { 
               ...pet, 
-              image_url: signedUrl
+              image_url: signedUrl || undefined // Ensure image_url is string | undefined, not null
             }
           }
           return pet
         })
       )
 
-      console.log('Processed images with URLs and view counts:', petsWithUrls.map(p => `${p.pet_name}: ${p.view_count}`))
-      setPetImages(petsWithUrls)
+      // If first page, replace all images; otherwise append
+      if (page === 1) {
+        setPetImages(petsWithUrls as PetImage[]) // Type assertion to fix type error
+      } else {
+        setPetImages(prevImages => [...prevImages, ...(petsWithUrls as PetImage[])]) // Type assertion to fix type error
+      }
+      
+      // Determine if there are more images to load
+      setHasMore(petsWithUrls.length === PAGE_SIZE && petsWithUrls.length + (page - 1) * PAGE_SIZE < totalCount)
+      setCurrentPage(page)
     } catch (err) {
       console.error('Failed to fetch pet images:', err)
       setError('Failed to load pet images')
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  useEffect(() => {
-    if (!isProcessingAuth) {
-      fetchImages()
+  // Load more images when user clicks "Load More"
+  const loadMoreImages = () => {
+    if (!isLoading && hasMore) {
+      fetchImages(currentPage + 1)
     }
-
-    // Set up a refresh interval to keep view counts updated
-    const refreshInterval = setInterval(() => {
-      if (!isProcessingAuth && !selectedImage) {
-        console.log('Refreshing image data...')
-        fetchImages()
-      }
-    }, 30000) // Refresh every 30 seconds
-
-    return () => clearInterval(refreshInterval)
-  }, [isProcessingAuth])
+  }
 
   const handleFileDrop = (acceptedFiles: File[]) => {
     setUploadedFiles(acceptedFiles)
@@ -312,16 +352,24 @@ function HomeContent() {
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold">Pet Rank</h1>
         <button 
-          onClick={() => fetchImages()}
+          onClick={() => fetchImages(1, true)}
           className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition-colors"
+          disabled={isLoading}
         >
-          Refresh Images
+          {isLoading ? 'Refreshing...' : 'Refresh Images'}
         </button>
       </div>
 
       {error && (
         <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-8">
           <p className="text-red-700">{error}</p>
+        </div>
+      )}
+
+      {isLoading && petImages.length === 0 && (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          <p className="ml-3 text-lg text-gray-600">Loading images...</p>
         </div>
       )}
 
@@ -333,7 +381,7 @@ function HomeContent() {
             onMouseDown={handleMouseDown}
             onTouchStart={(e) => handleTouchStart(e, petImages[0])}
             onTouchEnd={(e) => handleTouchEnd(e, petImages[0], 0)}
-            onTouchCancel={() => setTouchStartPos(null)} // Clear on touch cancel
+            onTouchCancel={() => setTouchStartPos(null)}
           >
             {petImages[0].image_url ? (
               <div className="relative">
@@ -379,60 +427,84 @@ function HomeContent() {
       </div>
 
       {petImages.length > 1 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {petImages.slice(1).map((pet, idx) => {
-            const originalIndex = idx + 1;
-            return (
-            <div 
-              key={pet.id} 
-              className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer transform transition-transform hover:scale-105"
-              onClick={(e) => handleClick(e, pet, originalIndex)}
-              onMouseDown={handleMouseDown}
-              onTouchStart={(e) => handleTouchStart(e, pet)}
-              onTouchEnd={(e) => handleTouchEnd(e, pet, originalIndex)}
-              onTouchCancel={() => setTouchStartPos(null)} // Clear on touch cancel
-            >
-              {pet.image_url ? (
-                <div className="relative">
-                  <img
-                    src={pet.image_url}
-                    alt={pet.pet_name}
-                    className="w-full h-40 object-cover"
-                    onError={async () => {
-                      if (pet.file_path) {
-                        const newUrl = await getSignedUrl(pet.file_path)
-                        if (newUrl) {
-                          setPetImages(images => 
-                            images.map(p => 
-                              p.id === pet.id ? { ...p, image_url: newUrl } : p
-                            )
-                          )
-                        }
-                      }
-                    }}
-                  />
-                  <div className="absolute top-0 right-0 bg-black bg-opacity-50 text-white px-2 py-1 text-sm rounded-bl">
-                    👁 {pet.view_count || 0}
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {petImages.slice(1).map((pet, idx) => {
+              const originalIndex = idx + 1;
+              return (
+                <div 
+                  key={pet.id} 
+                  className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer transform transition-transform hover:scale-105"
+                  onClick={(e) => handleClick(e, pet, originalIndex)}
+                  onMouseDown={handleMouseDown}
+                  onTouchStart={(e) => handleTouchStart(e, pet)}
+                  onTouchEnd={(e) => handleTouchEnd(e, pet, originalIndex)}
+                  onTouchCancel={() => setTouchStartPos(null)}
+                >
+                  {pet.image_url ? (
+                    <div className="relative">
+                      <img
+                        src={pet.image_url}
+                        alt={pet.pet_name}
+                        className="w-full h-40 object-cover"
+                        onError={async () => {
+                          if (pet.file_path) {
+                            const newUrl = await getSignedUrl(pet.file_path)
+                            if (newUrl) {
+                              setPetImages(images => 
+                                images.map(p => 
+                                  p.id === pet.id ? { ...p, image_url: newUrl } : p
+                                )
+                              )
+                            }
+                          }
+                        }}
+                      />
+                      <div className="absolute top-0 right-0 bg-black bg-opacity-50 text-white px-2 py-1 text-sm rounded-bl">
+                        👁 {pet.view_count || 0}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-full h-40 bg-gray-200 flex items-center justify-center">
+                      <span className="text-gray-500">Image not available</span>
+                    </div>
+                  )}
+                  <div className="p-2">
+                    <h3 className="text-sm font-semibold truncate">{pet.pet_name}</h3>
+                    <div className="text-xs text-gray-600">
+                      <p className="truncate">Age: {pet.age}</p>
+                      <p className="truncate">Gender: {pet.gender}</p>
+                    </div>
                   </div>
                 </div>
-              ) : (
-                <div className="w-full h-40 bg-gray-200 flex items-center justify-center">
-                  <span className="text-gray-500">Image not available</span>
-                </div>
-              )}
-              <div className="p-2">
-                <h3 className="text-sm font-semibold truncate">{pet.pet_name}</h3>
-                <div className="text-xs text-gray-600">
-                  <p className="truncate">Age: {pet.age}</p>
-                  <p className="truncate">Gender: {pet.gender}</p>
-                </div>
-              </div>
+              );
+            })}
+          </div>
+          
+          {/* Load more button */}
+          {hasMore && (
+            <div className="flex justify-center mt-8">
+              <button
+                onClick={loadMoreImages}
+                disabled={isLoading}
+                className={`px-6 py-3 rounded-lg text-white font-medium ${
+                  isLoading ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'
+                }`}
+              >
+                {isLoading ? (
+                  <span className="flex items-center">
+                    <span className="animate-spin h-4 w-4 border-t-2 border-b-2 border-white rounded-full mr-2"></span>
+                    Loading...
+                  </span>
+                ) : (
+                  'Load More Images'
+                )}
+              </button>
             </div>
-            );
-          })}
-        </div>
+          )}
+        </>
       ) : (
-        !petImages[0] && (
+        !petImages[0] && !isLoading && (
           <p className="text-center text-gray-500">
             {error ? 'Error loading images' : 'No approved pet images yet.'}
           </p>

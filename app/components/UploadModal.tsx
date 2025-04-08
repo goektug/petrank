@@ -1,287 +1,272 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { v4 as uuidv4 } from 'uuid'
 
 interface UploadModalProps {
-  isOpen?: boolean
   onClose: () => void
-  initialFile?: File | null
-  file?: File | null
+  file: File
 }
 
-interface PetUpload {
-  pet_name: string
-  age: string
-  gender: string
-  social_media_link: string | null
-  image_url: string
-  file_path: string
-  status: 'pending' | 'approved' | 'rejected'
-}
-
-export default function UploadModal({ isOpen = true, onClose, initialFile, file }: UploadModalProps) {
+export default function UploadModal({ onClose, file }: UploadModalProps) {
   const [petName, setPetName] = useState('')
   const [age, setAge] = useState('')
-  const [gender, setGender] = useState('')
+  const [gender, setGender] = useState('Male')
   const [socialMediaLink, setSocialMediaLink] = useState('')
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
-  const [error, setError] = useState('')
-  const [uploadProgress, setUploadProgress] = useState(0)
-  
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+
   const supabase = createClientComponentClient()
 
-  useEffect(() => {
-    // Handle both possible prop names for the file
-    const fileToUse = file || initialFile
-    if (fileToUse) {
-      setSelectedFile(fileToUse)
-    }
-  }, [initialFile, file])
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newFile = e.target.files?.[0]
-    if (newFile) {
-      // Check file type
-      if (!newFile.type.startsWith('image/')) {
-        setError('Please upload an image file')
-        return
-      }
-      // Check file size (5MB limit)
-      if (newFile.size > 5 * 1024 * 1024) {
-        setError('File size must be less than 5MB')
-        return
-      }
-      setSelectedFile(newFile)
-      setError('')
-    }
-  }
+  // Function to resize an image to reduce file size
+  const resizeImage = async (file: File, maxWidth: number = 1200, maxHeight: number = 1200, quality: number = 0.8): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        
+        // Calculate the new dimensions while maintaining aspect ratio
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round(height * maxWidth / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round(width * maxHeight / height);
+            height = maxHeight;
+          }
+        }
+        
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Could not get canvas context"));
+          return;
+        }
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Convert to blob
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error("Canvas to Blob conversion failed"));
+            }
+          },
+          file.type,
+          quality
+        );
+      };
+      
+      img.onerror = () => {
+        reject(new Error("Image loading failed"));
+      };
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedFile || !petName.trim()) {
-      setError('Please provide both a pet name and an image')
+    
+    if (!petName || !age || !gender) {
+      setError('Please fill in all required fields')
       return
     }
-
-    setIsUploading(true)
-    setError('')
-    setUploadProgress(0)
-
+    
     try {
-      console.log('Starting upload process...')
+      setIsUploading(true)
+      setError(null)
       
-      // Create the bucket if it doesn't exist
-      const { data: buckets, error: bucketsError } = await supabase
-        .storage
-        .listBuckets()
+      // Create a unique ID for the upload
+      const id = uuidv4()
 
-      if (bucketsError) {
-        throw new Error(`Failed to list buckets: ${bucketsError.message}`)
-      }
-
-      const petImagesBucket = buckets.find(b => b.name === 'pet-images')
+      // Resize the image before uploading to reduce size
+      console.log('Original image size:', Math.round(file.size / 1024), 'KB')
+      const resizedImage = await resizeImage(file, 1200, 1200, 0.85)
+      console.log('Resized image size:', Math.round(resizedImage.size / 1024), 'KB')
       
-      if (!petImagesBucket) {
-        console.log('Creating pet-images bucket...')
-        const { error: createBucketError } = await supabase
-          .storage
-          .createBucket('pet-images', {
-            public: false,
-            fileSizeLimit: 5242880,
-            allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif']
-          })
-
-        if (createBucketError) {
-          throw new Error(`Failed to create bucket: ${createBucketError.message}`)
-        }
-        console.log('Bucket created successfully')
-      }
-
-      // Upload image to Supabase Storage
-      const fileExt = selectedFile.name.split('.').pop()
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
-      const filePath = fileName
+      // Create a new file with the resized image
+      const resizedFile = new File([resizedImage], file.name, { 
+        type: file.type,
+        lastModified: file.lastModified 
+      })
       
-      console.log('Uploading file:', filePath)
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      // Generate a path for the file
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${id}.${fileExt}`
+      const filePath = `uploads/${fileName}`
+      
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
         .from('pet-images')
-        .upload(filePath, selectedFile, {
-          cacheControl: '3600',
-          upsert: false,
-          contentType: selectedFile.type
-        })
-
+        .upload(filePath, resizedFile)
+        
       if (uploadError) {
-        console.error('Upload error:', uploadError)
-        throw new Error(`Storage error: ${uploadError.message}`)
+        throw uploadError
       }
-
-      console.log('File uploaded successfully:', uploadData)
-
-      // Try to get signed URL
-      console.log('Getting signed URL for:', filePath)
-      const { data: urlData, error: signedUrlError } = await supabase.storage
-        .from('pet-images')
-        .createSignedUrl(filePath, 24 * 60 * 60) // 24 hours in seconds
-
-      if (signedUrlError) {
-        console.error('Signed URL error:', signedUrlError)
-        throw new Error(`Failed to get signed URL: ${signedUrlError.message}`)
-      }
-
-      if (!urlData?.signedUrl) {
-        throw new Error('No signed URL returned')
-      }
-
-      console.log('Got signed URL:', urlData.signedUrl)
-
-      // Create database entry
-      const { error: dbError } = await supabase
+      
+      // Insert metadata into database
+      const { error: insertError } = await supabase
         .from('pet_uploads')
         .insert({
-          pet_name: petName.trim(),
-          age: age.trim(),
-          gender: gender.trim(),
-          social_media_link: socialMediaLink.trim() || null,
-          image_url: urlData.signedUrl,
+          id,
+          pet_name: petName,
+          age,
+          gender,
+          social_media_link: socialMediaLink || null,
           file_path: filePath,
-          status: 'pending'
-        } as PetUpload)
-
-      if (dbError) {
-        console.error('Database error:', dbError)
-        // If database insert fails, try to delete the uploaded file
-        await supabase.storage
-          .from('pet-images')
-          .remove([filePath])
-        throw new Error(`Database error: ${dbError.message}`)
+          status: 'pending',
+          view_count: 0
+        })
+        
+      if (insertError) {
+        throw insertError
       }
-
-      console.log('Database entry created successfully')
-
-      // Success
-      onClose()
-      setPetName('')
-      setAge('')
-      setGender('')
-      setSocialMediaLink('')
-      setSelectedFile(null)
-      setUploadProgress(100)
-    } catch (err) {
+      
+      setSuccess(true)
+      setTimeout(onClose, 2000)
+      
+    } catch (err: any) {
       console.error('Upload error:', err)
-      setError(err instanceof Error ? err.message : 'Failed to upload. Please try again.')
-      setUploadProgress(0)
+      setError(err.message || 'An error occurred during upload')
     } finally {
       setIsUploading(false)
     }
   }
 
-  if (!isOpen) return null
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full">
-        <h2 className="text-2xl font-semibold mb-4">Upload Pet Photo</h2>
+      <div 
+        className="bg-white rounded-lg p-6 max-w-md w-full"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-semibold">Upload Your Pet</h2>
+          <button 
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            ✕
+          </button>
+        </div>
         
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Pet Name *</label>
-            <input
-              type="text"
-              value={petName}
-              onChange={(e) => setPetName(e.target.value)}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              required
-              maxLength={50}
-            />
+        {success ? (
+          <div className="text-center py-8">
+            <div className="text-green-500 text-5xl mb-3">✓</div>
+            <p className="text-lg font-medium">Upload Successful!</p>
+            <p className="text-gray-500 mt-1">Your pet photo is being reviewed.</p>
           </div>
-
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Age *</label>
-            <input
-              type="text"
-              value={age}
-              onChange={(e) => setAge(e.target.value)}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              required
-              placeholder="e.g., 2 years"
-              maxLength={20}
-            />
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Gender *</label>
-            <select
-              value={gender}
-              onChange={(e) => setGender(e.target.value)}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              required
-            >
-              <option value="">Select gender</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-            </select>
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Social Media Link</label>
-            <input
-              type="url"
-              value={socialMediaLink}
-              onChange={(e) => setSocialMediaLink(e.target.value)}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="https://..."
-            />
-          </div>
-
-          {!initialFile && (
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-1">Photo *</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="w-full"
-                required
-              />
-              <p className="text-xs text-gray-500 mt-1">Max file size: 5MB. Supported formats: JPG, PNG, GIF</p>
+        ) : (
+          <>
+            <div className="mb-6">
+              <div className="w-32 h-32 mx-auto rounded-lg overflow-hidden bg-gray-100">
+                <img 
+                  src={URL.createObjectURL(file)} 
+                  alt="Preview" 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <p className="text-center text-sm text-gray-500 mt-2">{file.name}</p>
             </div>
-          )}
-
-          {error && (
-            <p className="text-red-500 mb-4 text-sm">{error}</p>
-          )}
-
-          {uploadProgress > 0 && uploadProgress < 100 && (
-            <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
-              <div 
-                className="bg-blue-600 h-2.5 rounded-full" 
-                style={{ width: `${uploadProgress}%` }}
-              ></div>
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800"
-              disabled={isUploading}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isUploading}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isUploading ? 'Uploading...' : 'Upload'}
-            </button>
-          </div>
-        </form>
+            
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded mb-4">
+                {error}
+              </div>
+            )}
+            
+            <form onSubmit={handleSubmit}>
+              <div className="mb-4">
+                <label className="block text-gray-700 text-sm font-medium mb-1">
+                  Pet Name *
+                </label>
+                <input 
+                  type="text"
+                  value={petName}
+                  onChange={(e) => setPetName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  required
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-gray-700 text-sm font-medium mb-1">
+                  Age *
+                </label>
+                <input 
+                  type="text"
+                  value={age}
+                  onChange={(e) => setAge(e.target.value)}
+                  placeholder="e.g. 2 years"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  required
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-gray-700 text-sm font-medium mb-1">
+                  Gender *
+                </label>
+                <select
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  required
+                >
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              
+              <div className="mb-6">
+                <label className="block text-gray-700 text-sm font-medium mb-1">
+                  Social Media Link (Optional)
+                </label>
+                <input 
+                  type="url"
+                  value={socialMediaLink}
+                  onChange={(e) => setSocialMediaLink(e.target.value)}
+                  placeholder="e.g. https://instagram.com/pet"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Link to your pet's social media profile
+                </p>
+              </div>
+              
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 border border-gray-300 rounded-md mr-2"
+                  disabled={isUploading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className={`px-4 py-2 bg-blue-500 text-white rounded-md ${
+                    isUploading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-blue-600'
+                  }`}
+                  disabled={isUploading}
+                >
+                  {isUploading ? 'Uploading...' : 'Upload'}
+                </button>
+              </div>
+            </form>
+          </>
+        )}
       </div>
     </div>
   )
