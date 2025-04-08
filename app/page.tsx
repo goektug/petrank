@@ -108,6 +108,9 @@ function HomeContent() {
     }
   }
 
+  // Add a flag to control sorting behavior
+  const USE_VIEW_COUNT_SORT = true; // Set to TRUE to use view count sorting
+  
   // Simplified fetch images function that always gets fresh data
   const fetchImages = async (page = 1) => {
     try {
@@ -125,43 +128,36 @@ function HomeContent() {
       // Calculate offset
       const offset = (page - 1) * PAGE_SIZE
       
-      // First do a simple count to verify how many images exist with any view count
-      const { count: anyViewCount } = await supabase
+      // Add a direct test query for images with view_count < 100
+      const { data: lowViewImages, error: lowViewError } = await supabase
         .from('pet_uploads')
-        .select('*', { count: 'exact', head: true })
+        .select('id, pet_name, view_count')
         .eq('status', 'approved')
+        .lt('view_count', 100) // Explicitly look for low view counts
       
-      console.log(`Total number of approved images with any view count: ${anyViewCount}`)
+      console.log(`Images with view_count < 100:`, lowViewImages?.length || 0)
+      if (lowViewImages && lowViewImages.length > 0) {
+        console.log(`Sample low view images:`, lowViewImages.slice(0, 3))
+      }
       
-      // Query with order by created_at
-      const { data: dataByDate, error: errorByDate } = await supabase
-        .from('pet_uploads')
-        .select('id, pet_name, view_count, created_at')
-        .eq('status', 'approved')
-        .order('created_at', { ascending: false })
-        
-      console.log('Images sorted by date:', dataByDate?.map(p => 
-        `${p.pet_name}: view_count=${p.view_count || 'NULL'}, created=${new Date(p.created_at).toLocaleDateString()}`
-      ))
-        
-      // Query with order by view_count
-      const { data: dataByViews, error: errorByViews } = await supabase
-        .from('pet_uploads')
-        .select('id, pet_name, view_count, created_at')
-        .eq('status', 'approved')
-        .order('view_count', { ascending: false, nullsFirst: false })
-        
-      console.log('Images sorted by view count:', dataByViews?.map(p => 
-        `${p.pet_name}: view_count=${p.view_count || 'NULL'}, created=${new Date(p.created_at).toLocaleDateString()}`
-      ))
-      
-      // Get all approved images sorted properly by view count
-      const { data, error } = await supabase
+      // Get all approved images with configurable sorting
+      const query = supabase
         .from('pet_uploads')
         .select('id, pet_name, age, gender, social_media_link, file_path, view_count, created_at, image_url')
-        .eq('status', 'approved')
-        .order('view_count', { ascending: false, nullsFirst: false }) // Put NULLs at the end
-        .range(offset, offset + PAGE_SIZE - 1)
+        .eq('status', 'approved');
+      
+      // Apply sorting based on flag
+      if (USE_VIEW_COUNT_SORT) {
+        query
+          .order('view_count', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false });
+      } else {
+        // Use date-based sorting as a fallback to ensure all images appear
+        query.order('created_at', { ascending: false });
+      }
+      
+      // Apply pagination
+      const { data, error } = await query.range(offset, offset + PAGE_SIZE - 1);
       
       if (error) {
         console.error('Error fetching pet images:', error)
@@ -233,12 +229,24 @@ function HomeContent() {
 
       // Prefetch the next page of images
       if (petsWithUrls.length === PAGE_SIZE && page * PAGE_SIZE < totalCount) {
-        const { data: nextPageData } = await supabase
+        const prefetchQuery = supabase
           .from('pet_uploads')
           .select('id, file_path')
-          .eq('status', 'approved')
-          .order('view_count', { ascending: false, nullsFirst: false }) // Match the main query's ordering
-          .range(offset + PAGE_SIZE, offset + PAGE_SIZE * 2 - 1)
+          .eq('status', 'approved');
+        
+        // Apply the same sorting logic
+        if (USE_VIEW_COUNT_SORT) {
+          prefetchQuery
+            .order('view_count', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: false });
+        } else {
+          prefetchQuery.order('created_at', { ascending: false });
+        }
+        
+        const { data: nextPageData } = await prefetchQuery.range(
+          offset + PAGE_SIZE, 
+          offset + PAGE_SIZE * 2 - 1
+        );
         
         if (nextPageData && nextPageData.length > 0) {
           // Prefetch in background
@@ -447,6 +455,7 @@ function HomeContent() {
                     src={petImages[0].image_url}
                     alt={petImages[0].pet_name}
                     fill
+                    unoptimized={petImages[0].image_url?.includes('token=')} // Skip optimization for signed URLs
                     sizes="(max-width: 768px) 100vw, 1200px"
                     priority={true}
                     className="object-cover"
@@ -511,6 +520,7 @@ function HomeContent() {
                           src={pet.image_url}
                           alt={pet.pet_name}
                           fill
+                          unoptimized={pet.image_url?.includes('token=')} // Skip optimization for signed URLs
                           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                           className="object-cover"
                           onError={async () => {
@@ -618,6 +628,7 @@ function HomeContent() {
                       src={selectedImage.image_url}
                       alt={selectedImage.pet_name}
                       fill
+                      unoptimized={selectedImage.image_url?.includes('token=')} // Skip optimization for signed URLs
                       sizes="80vw"
                       className="object-contain"
                       onError={async () => {

@@ -16,6 +16,13 @@ const isUrlExpired = (cachedData: string): boolean => {
   }
 };
 
+// Get a direct public URL (not signed) which is more compatible with Next.js Image
+const getPublicImageUrl = (filePath: string): string => {
+  const supabase = createClientComponentClient();
+  const { data } = supabase.storage.from('pet-images').getPublicUrl(filePath);
+  return data?.publicUrl || '';
+};
+
 // Get URL from cache or fetch a new one
 export const getCachedImageUrl = async (
   filePath: string,
@@ -26,7 +33,15 @@ export const getCachedImageUrl = async (
     return null; // Return null during SSR
   }
 
-  // Try to get from localStorage first
+  // First try to generate a direct public URL (not signed)
+  // This is more compatible with Next.js Image component
+  const publicUrl = getPublicImageUrl(filePath);
+  if (publicUrl) {
+    console.log(`Using public URL for pet ${petId}`);
+    return publicUrl;
+  }
+
+  // If public URL fails, try to get from localStorage first
   const cacheKey = `pet_image_${petId}`;
   const cachedData = localStorage.getItem(cacheKey);
   
