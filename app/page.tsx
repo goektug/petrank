@@ -1,11 +1,14 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, Suspense, useCallback } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter, useSearchParams } from 'next/navigation'
 import DropZone from './components/DropZone'
 import UploadModal from './components/UploadModal'
+import { getCachedImageUrl, prefetchImageUrls } from './utils/imageCache'
+import viewCountBatcher from './utils/viewCountBatcher'
 
 interface PetImage {
   id: string
@@ -85,23 +88,6 @@ function HomeContent() {
     }
   }
 
-  const getSignedUrl = async (filePath: string) => {
-    try {
-      const { data, error } = await supabase.storage.from('pet-images').createSignedUrl(
-        filePath, 
-        15 * 60 // 15 minutes instead of 1 hour
-      )
-      if (error) {
-        console.error('Error getting signed URL:', error)
-        return null
-      }
-      return data.signedUrl
-    } catch (err) {
-      console.error('Failed to get signed URL:', err)
-      return null
-    }
-  }
-
   // Get total count of approved images
   const fetchTotalCount = async () => {
     try {
@@ -122,7 +108,7 @@ function HomeContent() {
     }
   }
 
-  // Paginated fetch function
+  // Modified to use caching and Image component
   const fetchImages = async (page = 1, forceRefresh = false) => {
     if (isLoading && !forceRefresh) return
     
@@ -170,14 +156,14 @@ function HomeContent() {
         view_count: typeof pet.view_count === 'number' ? pet.view_count : 0
       }))
 
-      // Get signed URLs only for visible images
+      // Get cached image URLs in parallel
       const petsWithUrls = await Promise.all(
         processedData.map(async (pet) => {
           if (pet.file_path) {
-            const signedUrl = await getSignedUrl(pet.file_path)
+            const signedUrl = await getCachedImageUrl(pet.file_path, pet.id)
             return { 
               ...pet, 
-              image_url: signedUrl || undefined // Ensure image_url is string | undefined, not null
+              image_url: signedUrl || undefined
             }
           }
           return pet
@@ -186,14 +172,29 @@ function HomeContent() {
 
       // If first page, replace all images; otherwise append
       if (page === 1) {
-        setPetImages(petsWithUrls as PetImage[]) // Type assertion to fix type error
+        setPetImages(petsWithUrls as PetImage[])
       } else {
-        setPetImages(prevImages => [...prevImages, ...(petsWithUrls as PetImage[])]) // Type assertion to fix type error
+        setPetImages(prevImages => [...prevImages, ...(petsWithUrls as PetImage[])])
       }
       
       // Determine if there are more images to load
       setHasMore(petsWithUrls.length === PAGE_SIZE && petsWithUrls.length + (page - 1) * PAGE_SIZE < totalCount)
       setCurrentPage(page)
+
+      // Prefetch the next page of images
+      if (petsWithUrls.length === PAGE_SIZE && page * PAGE_SIZE < totalCount) {
+        const { data: nextPageData } = await supabase
+          .from('pet_uploads')
+          .select('id, file_path')
+          .eq('status', 'approved')
+          .order('view_count', { ascending: false })
+          .range(offset + PAGE_SIZE, offset + PAGE_SIZE * 2 - 1)
+        
+        if (nextPageData && nextPageData.length > 0) {
+          // Prefetch in background
+          prefetchImageUrls(nextPageData)
+        }
+      }
     } catch (err) {
       console.error('Failed to fetch pet images:', err)
       setError('Failed to load pet images')
@@ -220,43 +221,48 @@ function HomeContent() {
     setCurrentFile(null)
   }
 
-  const handleImageClick = async (pet: PetImage, index: number) => {
+  // Update view counts with batching system
+  useEffect(() => {
+    // Start the view count batcher with 1-minute interval
+    viewCountBatcher.startBatching(60 * 1000)
+    
+    // Set up a listener to update UI when counts change
+    const removeListener = viewCountBatcher.addListener((petId, newCount) => {
+      setPetImages(images => 
+        images.map(p => 
+          p.id === petId ? { ...p, view_count: newCount } : p
+        )
+      )
+      
+      // Also update selected image if it's the one being updated
+      setSelectedImage(prev => 
+        prev && prev.id === petId ? { ...prev, view_count: newCount } : prev
+      )
+    })
+    
+    // Clean up on unmount
+    return () => {
+      viewCountBatcher.stopBatching()
+      removeListener()
+    }
+  }, [])
+
+  // Modified handleImageClick to use the batcher
+  const handleImageClick = useCallback((pet: PetImage, index: number) => {
     console.log('Image clicked:', pet.id, 'at index:', index)
     setSelectedImage(pet)
     setSelectedImageIndex(index)
     
-    try {
-      const { error: rpcError } = await supabase
-        .rpc('increment_view_count', { pet_id: pet.id })
-      if (rpcError) {
-        console.error('[handleImageClick] Error calling RPC increment_view_count:', rpcError)
-        return 
-      }
-      console.log('[handleImageClick] RPC increment_view_count called successfully for pet:', pet.id)
-      const { data: updatedPetData, error: fetchError } = await supabase
-        .from('pet_uploads')
-        .select('view_count')
-        .eq('id', pet.id)
-        .single()
-      if (fetchError) {
-        console.error('[handleImageClick] Error fetching updated view count after RPC call:', fetchError)
-        return
-      }
-      const newCount = updatedPetData.view_count
-      console.log('[handleImageClick] Successfully fetched updated view count:', newCount, 'for pet:', pet.id)
-      setPetImages(images => 
-        images.map(p => 
-          p.id === pet.id ? { ...p, view_count: newCount } : p
-        )
+    // Add to view count batch instead of immediately updating DB
+    viewCountBatcher.incrementViewCount(pet.id)
+    
+    // Optimistically update the UI right away
+    setPetImages(images => 
+      images.map(p => 
+        p.id === pet.id ? { ...p, view_count: (p.view_count || 0) + 1 } : p
       )
-      setSelectedImage(prev => 
-        prev && prev.id === pet.id ? { ...prev, view_count: newCount } : prev
-      )
-      setSelectedImageIndex(prevIndex => prevIndex === index ? index : prevIndex) 
-    } catch (err) {
-      console.error('[handleImageClick] Unexpected error:', err)
-    }
-  }
+    )
+  }, [])
 
   // Modified touch event handler for mobile devices
   const handleTouchStart = (e: React.TouchEvent, pet: PetImage) => {
@@ -385,23 +391,29 @@ function HomeContent() {
           >
             {petImages[0].image_url ? (
               <div className="relative">
-                <img
-                  src={petImages[0].image_url}
-                  alt={petImages[0].pet_name}
-                  className="w-full h-[400px] object-cover"
-                  onError={async () => {
-                    if (petImages[0].file_path) {
-                      const newUrl = await getSignedUrl(petImages[0].file_path)
-                      if (newUrl) {
-                        setPetImages(images => 
-                          images.map(p => 
-                            p.id === petImages[0].id ? { ...p, image_url: newUrl } : p
+                <div className="relative w-full h-[400px]">
+                  <Image
+                    src={petImages[0].image_url}
+                    alt={petImages[0].pet_name}
+                    fill
+                    sizes="(max-width: 768px) 100vw, 1200px"
+                    priority={true}
+                    className="object-cover"
+                    onError={async () => {
+                      if (petImages[0].file_path) {
+                        // Refresh the URL if it fails to load
+                        const newUrl = await getCachedImageUrl(petImages[0].file_path, petImages[0].id, 1) // Short cache time for error case
+                        if (newUrl) {
+                          setPetImages(images => 
+                            images.map(p => 
+                              p.id === petImages[0].id ? { ...p, image_url: newUrl } : p
+                            )
                           )
-                        )
+                        }
                       }
-                    }
-                  }}
-                />
+                    }}
+                  />
+                </div>
                 <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-2 text-lg rounded-full">
                   👁 {petImages[0].view_count || 0}
                 </div>
@@ -443,39 +455,46 @@ function HomeContent() {
                 >
                   {pet.image_url ? (
                     <div className="relative">
-                      <img
-                        src={pet.image_url}
-                        alt={pet.pet_name}
-                        className="w-full h-40 object-cover"
-                        onError={async () => {
-                          if (pet.file_path) {
-                            const newUrl = await getSignedUrl(pet.file_path)
-                            if (newUrl) {
-                              setPetImages(images => 
-                                images.map(p => 
-                                  p.id === pet.id ? { ...p, image_url: newUrl } : p
+                      <div className="relative w-full h-40">
+                        <Image
+                          src={pet.image_url}
+                          alt={pet.pet_name}
+                          fill
+                          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                          className="object-cover"
+                          onError={async () => {
+                            if (pet.file_path) {
+                              const newUrl = await getCachedImageUrl(pet.file_path, pet.id, 1)
+                              if (newUrl) {
+                                setPetImages(images => 
+                                  images.map(p => 
+                                    p.id === pet.id ? { ...p, image_url: newUrl } : p
+                                  )
                                 )
-                              )
+                              }
                             }
-                          }
-                        }}
-                      />
-                      <div className="absolute top-0 right-0 bg-black bg-opacity-50 text-white px-2 py-1 text-sm rounded-bl">
+                          }}
+                        />
+                      </div>
+                      <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 text-sm rounded-full">
                         👁 {pet.view_count || 0}
+                      </div>
+                      <div className="p-3">
+                        <h3 className="font-medium text-gray-900">{pet.pet_name}</h3>
+                        <p className="text-sm text-gray-500">{pet.age} • {pet.gender}</p>
                       </div>
                     </div>
                   ) : (
-                    <div className="w-full h-40 bg-gray-200 flex items-center justify-center">
-                      <span className="text-gray-500">Image not available</span>
+                    <div>
+                      <div className="h-40 bg-gray-200 flex items-center justify-center">
+                        <span className="text-sm text-gray-500">Image not available</span>
+                      </div>
+                      <div className="p-3">
+                        <h3 className="font-medium text-gray-900">{pet.pet_name}</h3>
+                        <p className="text-sm text-gray-500">{pet.age} • {pet.gender}</p>
+                      </div>
                     </div>
                   )}
-                  <div className="p-2">
-                    <h3 className="text-sm font-semibold truncate">{pet.pet_name}</h3>
-                    <div className="text-xs text-gray-600">
-                      <p className="truncate">Age: {pet.age}</p>
-                      <p className="truncate">Gender: {pet.gender}</p>
-                    </div>
-                  </div>
                 </div>
               );
             })}
@@ -511,13 +530,13 @@ function HomeContent() {
         )
       )}
 
-      {/* Image Preview Modal */}
+      {/* Image Preview Modal - also updated to use Next.js Image */}
       {selectedImage && selectedImageIndex !== null && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50"
           onClick={() => {
-              setSelectedImage(null);
-              setSelectedImageIndex(null); 
+            setSelectedImage(null);
+            setSelectedImageIndex(null); 
           }}
         >
           {/* --- Previous Button --- */}
@@ -541,12 +560,26 @@ function HomeContent() {
             {/* Force a complete rerender of the entire modal content when image changes */}
             <div key={`modal-content-${selectedImage.id}`} className="modal-content">
               <div className="relative">
-                <img
-                  key={selectedImage.id}
-                  src={selectedImage.image_url}
-                  alt={selectedImage.pet_name}
-                  className="w-full max-h-[80vh] object-contain bg-black"
-                />
+                <div className="relative w-full h-[80vh] max-h-[80vh] bg-black">
+                  {selectedImage.image_url && (
+                    <Image
+                      key={selectedImage.id}
+                      src={selectedImage.image_url}
+                      alt={selectedImage.pet_name}
+                      fill
+                      sizes="80vw"
+                      className="object-contain"
+                      onError={async () => {
+                        if (selectedImage.file_path) {
+                          const newUrl = await getCachedImageUrl(selectedImage.file_path, selectedImage.id, 1)
+                          if (newUrl) {
+                            setSelectedImage(prev => prev ? { ...prev, image_url: newUrl } : null)
+                          }
+                        }
+                      }}
+                    />
+                  )}
+                </div>
                 <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded">
                   👁 {selectedImage.view_count || 0} views
                 </div>
@@ -607,11 +640,11 @@ function HomeContent() {
   )
 }
 
-export default function HomePage() {
+export default function Home() {
   return (
     <Suspense fallback={
       <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-gray-900"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     }>
       <HomeContent />

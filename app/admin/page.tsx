@@ -1,9 +1,11 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
+import { getCachedImageUrl } from '../utils/imageCache'
 
 interface PetUpload {
   id: string
@@ -29,22 +31,6 @@ function AdminDashboard() {
     fetchPendingUploads()
   }, [])
 
-  const getSignedUrl = async (filePath: string) => {
-    try {
-      const { data, error } = await supabase.storage
-        .from('pet-images')
-        .createSignedUrl(filePath, 24 * 60 * 60) // 24 hours
-
-      if (error) {
-        return null
-      }
-
-      return data.signedUrl
-    } catch (err) {
-      return null
-    }
-  }
-
   const fetchPendingUploads = async () => {
     try {
       setLoading(true)
@@ -62,13 +48,13 @@ function AdminDashboard() {
         return
       }
 
-      // Get fresh signed URLs for all images
+      // Get fresh signed URLs for all images using our cache system
       const updatedUploads = await Promise.all(uploads.map(async (upload) => {
         if (!upload.file_path) {
           return upload
         }
 
-        const signedUrl = await getSignedUrl(upload.file_path)
+        const signedUrl = await getCachedImageUrl(upload.file_path, upload.id)
         return {
           ...upload,
           image_url: signedUrl || upload.image_url
@@ -166,11 +152,27 @@ function AdminDashboard() {
             pendingUploads.map((upload) => (
               <div key={upload.id} className="border rounded-lg p-4">
                 {upload.image_url ? (
-                  <img 
-                    src={upload.image_url} 
-                    alt={upload.pet_name} 
-                    className="w-full h-48 object-cover rounded-lg mb-4"
-                  />
+                  <div className="relative w-full h-48 mb-4">
+                    <Image 
+                      src={upload.image_url} 
+                      alt={upload.pet_name} 
+                      fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      className="object-cover rounded-lg"
+                      onError={async () => {
+                        if (upload.file_path) {
+                          const newUrl = await getCachedImageUrl(upload.file_path, upload.id, 1)
+                          if (newUrl) {
+                            setPendingUploads(uploads => 
+                              uploads.map(u => 
+                                u.id === upload.id ? { ...u, image_url: newUrl } : u
+                              )
+                            )
+                          }
+                        }
+                      }}
+                    />
+                  </div>
                 ) : (
                   <div className="w-full h-48 bg-gray-200 flex items-center justify-center rounded-lg mb-4">
                     <span className="text-gray-500">Image not available</span>
@@ -190,7 +192,7 @@ function AdminDashboard() {
                       <p>Views: {upload.view_count}</p>
                     )}
                     {upload.social_media_link && (
-                      <p className="mt-4 text-center">
+                      <div className="mt-4 text-center">
                         <a 
                           href={upload.social_media_link}
                           target="_blank"
@@ -199,7 +201,7 @@ function AdminDashboard() {
                         >
                           Social Media
                         </a>
-                      </p>
+                      </div>
                     )}
                   </div>
                 </div>
