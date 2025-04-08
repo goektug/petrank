@@ -125,12 +125,20 @@ function HomeContent() {
       // Calculate offset
       const offset = (page - 1) * PAGE_SIZE
       
-      // Get all approved images without filtering by view_count
+      // First do a simple count to verify how many images exist with any view count
+      const { count: anyViewCount } = await supabase
+        .from('pet_uploads')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'approved')
+      
+      console.log(`Total number of approved images with any view count: ${anyViewCount}`)
+      
+      // Get all approved images sorted by created date if nothing else works
       const { data, error } = await supabase
         .from('pet_uploads')
-        .select('id, pet_name, age, gender, social_media_link, file_path, view_count, created_at')
+        .select('id, pet_name, age, gender, social_media_link, file_path, view_count, created_at, image_url')
         .eq('status', 'approved')
-        .order('view_count', { ascending: false, nullsFirst: false }) // nullsFirst: false puts nulls last
+        .order('created_at', { ascending: false }) // Sort by newest first instead of view_count
         .range(offset, offset + PAGE_SIZE - 1)
       
       if (error) {
@@ -168,11 +176,17 @@ function HomeContent() {
       // Get cached image URLs in parallel
       const petsWithUrls = await Promise.all(
         processedData.map(async (pet) => {
+          // If the pet already has an image_url, use it directly
+          if (pet.image_url) {
+            return pet;
+          }
+          
+          // Otherwise, get a signed URL from storage
           if (pet.file_path) {
             const signedUrl = await getCachedImageUrl(pet.file_path, pet.id)
             return { 
               ...pet, 
-              image_url: signedUrl || undefined
+              image_url: signedUrl || pet.image_url || undefined
             }
           }
           return pet
@@ -201,7 +215,7 @@ function HomeContent() {
           .from('pet_uploads')
           .select('id, file_path')
           .eq('status', 'approved')
-          .order('view_count', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false }) // Match the main query's ordering
           .range(offset + PAGE_SIZE, offset + PAGE_SIZE * 2 - 1)
         
         if (nextPageData && nextPageData.length > 0) {
