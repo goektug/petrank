@@ -98,6 +98,7 @@ function HomeContent() {
 
   // Handle OAuth code if present in URL
   useEffect(() => {
+    // Save the current URL search params to a ref to avoid re-triggering this effect
     const code = searchParams.get('code')
     if (code) {
       console.log(`OAuth code detected: ${code.substring(0, 8)}...`)
@@ -115,7 +116,7 @@ function HomeContent() {
       newUrl.searchParams.delete('refresh')
       window.history.replaceState({}, '', newUrl)
     }
-  }, [searchParams])
+  }, []); // Empty dependency array - only run once on mount
 
   const handleOAuthCode = async (code: string) => {
     try {
@@ -354,13 +355,20 @@ function HomeContent() {
     }
   }
 
-  // Always fetch images when component mounts
+  // Always fetch images when component mounts, but only once
   useEffect(() => {
-    if (!isProcessingAuth) {
+    let isMounted = true;
+    
+    if (!isProcessingAuth && isMounted) {
       // Always fetch from page 1 on initial load
+      console.log('Initial fetch of images')
       fetchImages(1)
     }
-  }, [isProcessingAuth])
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [isProcessingAuth]); // Only re-run if auth status changes
 
   const handleFileDrop = (acceptedFiles: File[]) => {
     setUploadedFiles(acceptedFiles)
