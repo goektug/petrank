@@ -9,7 +9,7 @@ const nextConfig = {
   experimental: {
     // Enable better caching
     optimizeCss: true,
-    optimizePackageImports: true,
+    optimizePackageImports: ['@supabase/auth-helpers-nextjs', 'uuid', 'react', 'next/image'],
   },
 }
 
