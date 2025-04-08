@@ -129,7 +129,7 @@ function AdminDashboard() {
         <h1 className="text-3xl font-bold">Admin Panel</h1>
         <div className="flex gap-4">
           <Link 
-            href="/"
+            href="/?refresh=true"
             className="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors"
           >
             Back to Home

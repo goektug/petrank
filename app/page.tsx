@@ -41,6 +41,13 @@ function HomeContent() {
       console.log(`OAuth code detected: ${code.substring(0, 8)}...`)
       handleOAuthCode(code)
     }
+
+    // Check for refresh parameter and force data refresh
+    const refresh = searchParams.get('refresh')
+    if (refresh === 'true') {
+      console.log('Refresh parameter detected, forcing data refresh')
+      fetchImages()
+    }
   }, [searchParams])
 
   const handleOAuthCode = async (code: string) => {
@@ -84,68 +91,69 @@ function HomeContent() {
     }
   }
 
-  useEffect(() => {
-    async function fetchImages() {
-      try {
-        console.log('Fetching images from database...')
-        const { data, error } = await supabase
-          .from('pet_uploads')
-          .select('*')
-          .eq('status', 'approved')
-          .order('view_count', { ascending: false })
-          .limit(50) // Limit to reasonable number of images
-        
-        if (error) {
-          console.error('Error fetching pet images:', error)
-          setError('Failed to load pet images')
-          return
-        }
-
-        if (!data || data.length === 0) {
-          console.log('No approved images found')
-          setPetImages([])
-          return
-        }
-
-        console.log('Raw data from database:', data)
-        
-        // Initialize view_count as 0 for any null values
-        const processedData = data.map(pet => ({
-          ...pet,
-          view_count: typeof pet.view_count === 'number' ? pet.view_count : 0
-        }))
-
-        // Log each pet's view count for debugging
-        processedData.forEach(pet => {
-          console.log(`Pet ${pet.pet_name} (${pet.id}): view_count = ${pet.view_count}`)
-        })
-
-        // Sort by view_count descending
-        processedData.sort((a, b) => b.view_count - a.view_count)
-        
-        console.log('Processed data with view counts:', processedData)
-
-        const petsWithUrls = await Promise.all(
-          processedData.map(async (pet) => {
-            if (pet.file_path) {
-              const signedUrl = await getSignedUrl(pet.file_path)
-              return { 
-                ...pet, 
-                image_url: signedUrl
-              }
-            }
-            return pet
-          })
-        )
-
-        console.log('Processed images with URLs and view counts:', petsWithUrls.map(p => `${p.pet_name}: ${p.view_count}`))
-        setPetImages(petsWithUrls)
-      } catch (err) {
-        console.error('Failed to fetch pet images:', err)
+  // Move fetchImages out of the useEffect to make it callable from other places
+  const fetchImages = async () => {
+    try {
+      console.log('Fetching images from database...')
+      const { data, error } = await supabase
+        .from('pet_uploads')
+        .select('*')
+        .eq('status', 'approved')
+        .order('view_count', { ascending: false })
+        .limit(50) // Limit to reasonable number of images
+      
+      if (error) {
+        console.error('Error fetching pet images:', error)
         setError('Failed to load pet images')
+        return
       }
-    }
 
+      if (!data || data.length === 0) {
+        console.log('No approved images found')
+        setPetImages([])
+        return
+      }
+
+      console.log('Raw data from database:', data)
+      
+      // Initialize view_count as 0 for any null values
+      const processedData = data.map(pet => ({
+        ...pet,
+        view_count: typeof pet.view_count === 'number' ? pet.view_count : 0
+      }))
+
+      // Log each pet's view count for debugging
+      processedData.forEach(pet => {
+        console.log(`Pet ${pet.pet_name} (${pet.id}): view_count = ${pet.view_count}`)
+      })
+
+      // Sort by view_count descending
+      processedData.sort((a, b) => b.view_count - a.view_count)
+      
+      console.log('Processed data with view counts:', processedData)
+
+      const petsWithUrls = await Promise.all(
+        processedData.map(async (pet) => {
+          if (pet.file_path) {
+            const signedUrl = await getSignedUrl(pet.file_path)
+            return { 
+              ...pet, 
+              image_url: signedUrl
+            }
+          }
+          return pet
+        })
+      )
+
+      console.log('Processed images with URLs and view counts:', petsWithUrls.map(p => `${p.pet_name}: ${p.view_count}`))
+      setPetImages(petsWithUrls)
+    } catch (err) {
+      console.error('Failed to fetch pet images:', err)
+      setError('Failed to load pet images')
+    }
+  }
+
+  useEffect(() => {
     if (!isProcessingAuth) {
       fetchImages()
     }
@@ -301,7 +309,15 @@ function HomeContent() {
 
   return (
     <main className="container mx-auto px-4 py-8">
-      <h1 className="text-4xl font-bold text-center mb-8">Pet Rank</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-4xl font-bold">Pet Rank</h1>
+        <button 
+          onClick={() => fetchImages()}
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition-colors"
+        >
+          Refresh Images
+        </button>
+      </div>
 
       {error && (
         <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-8">
