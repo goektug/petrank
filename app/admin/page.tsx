@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { getCachedImageUrl } from '../utils/imageCache'
 
 interface PetUpload {
@@ -26,10 +26,21 @@ function AdminDashboard() {
   const [error, setError] = useState<string | null>(null)
   const supabase = createClientComponentClient()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   useEffect(() => {
+    // Check if we need to refresh the data
+    const shouldRefresh = searchParams.get('refresh') === 'true'
+    
     fetchPendingUploads()
-  }, [])
+    
+    // If refresh parameter exists, remove it from the URL to prevent constant refreshing
+    if (shouldRefresh) {
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('refresh')
+      window.history.replaceState({}, '', newUrl)
+    }
+  }, [searchParams])
 
   const fetchPendingUploads = async () => {
     try {
@@ -157,6 +168,7 @@ function AdminDashboard() {
                       src={upload.image_url} 
                       alt={upload.pet_name} 
                       fill
+                      unoptimized={upload.image_url?.includes('token=')}
                       sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                       className="object-cover rounded-lg"
                       onError={async () => {

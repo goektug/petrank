@@ -7,6 +7,11 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'cblsslcreohsrhnurfev.supabase.co',
         pathname: '/storage/v1/object/sign/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cblsslcreohsrhnurfev.supabase.co',
+        pathname: '/storage/v1/object/public/**',
       }
     ],
     minimumCacheTTL: 2592000, // 30 days caching
