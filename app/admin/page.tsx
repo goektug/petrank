@@ -168,7 +168,7 @@ function AdminDashboard() {
                       src={upload.image_url} 
                       alt={upload.pet_name} 
                       fill
-                      unoptimized={upload.image_url?.includes('token=')}
+                      unoptimized={true}
                       sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                       className="object-cover rounded-lg"
                       onError={async () => {

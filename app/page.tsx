@@ -547,7 +547,7 @@ function HomeContent() {
                     src={petImages[0].image_url}
                     alt={petImages[0].pet_name}
                     fill
-                    unoptimized={petImages[0].image_url?.includes('token=')} // Skip optimization for signed URLs
+                    unoptimized={true}
                     sizes="(max-width: 768px) 100vw, 1200px"
                     priority={true}
                     className="object-cover"
@@ -612,7 +612,7 @@ function HomeContent() {
                           src={pet.image_url}
                           alt={pet.pet_name}
                           fill
-                          unoptimized={pet.image_url?.includes('token=')} // Skip optimization for signed URLs
+                          unoptimized={true}
                           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                           className="object-cover"
                           onError={async () => {
@@ -720,7 +720,7 @@ function HomeContent() {
                       src={selectedImage.image_url}
                       alt={selectedImage.pet_name}
                       fill
-                      unoptimized={selectedImage.image_url?.includes('token=')} // Skip optimization for signed URLs
+                      unoptimized={true}
                       sizes="80vw"
                       className="object-contain"
                       onError={async () => {
