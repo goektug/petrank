@@ -23,21 +23,21 @@ export async function POST(request: Request) {
       );
     }
     
-    // Create Supabase client inside the handler
+    // Create Supabase client inside the handler using the ANON key
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''; // Use Anon key
     
-    if (!supabaseUrl || !supabaseServiceKey) {
-      console.error('Missing Supabase URL or service key');
+    if (!supabaseUrl || !supabaseAnonKey) { // Check for Anon key
+      console.error('Missing Supabase URL or anon key'); // Update error message
       return NextResponse.json(
         { success: false, error: 'Server configuration error' },
         { status: 500 }
       );
     }
     
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(supabaseUrl, supabaseAnonKey); // Use Anon key
     
-    console.log(`Processing view increment for pet ID: ${pet_id}`);
+    console.log(`Processing view increment for pet ID: ${pet_id} (using anon key)`);
     
     // Simplest approach: Get current value then increment
     try {

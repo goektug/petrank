@@ -30,12 +30,12 @@ export async function GET(request: Request) {
   }
   
   try {
-    // Create Supabase client inside the handler
+    // Create Supabase client inside the handler using the ANON key
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''; // Use Anon key
     
-    if (!supabaseUrl || !supabaseServiceKey) {
-      console.error('Missing Supabase URL or service key in ping-view');
+    if (!supabaseUrl || !supabaseAnonKey) { // Check for Anon key
+      console.error('Missing Supabase URL or anon key in ping-view'); // Update error message
       // Still return the pixel even if we can't update the count
       return new NextResponse(TRANSPARENT_GIF, {
         status: 200,
@@ -48,7 +48,9 @@ export async function GET(request: Request) {
       });
     }
     
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(supabaseUrl, supabaseAnonKey); // Use Anon key
+    
+    console.log(`Processing ping view increment for pet ID: ${petId} (using anon key)`);
     
     // Simplest approach: Get current value then increment
     try {
