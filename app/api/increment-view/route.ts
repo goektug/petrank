@@ -1,56 +1,69 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+
+// Create a basic client that doesn't rely on cookies
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export async function POST(request: Request) {
-  const body = await request.json()
-  const { pet_id } = body
-  
-  if (!pet_id) {
-    return NextResponse.json({ error: 'Missing pet_id parameter' }, { status: 400 })
-  }
-  
-  // Create a regular Supabase client (no service role)
-  const supabase = createRouteHandlerClient({ cookies })
-  
   try {
-    // Get the current view count
-    const { data: currentData, error: fetchError } = await supabase
-      .from('pet_uploads')
-      .select('view_count')
-      .eq('id', pet_id)
-      .single()
-    
-    if (fetchError) {
-      console.error('Error fetching current view count:', fetchError)
-      throw fetchError
+    // Parse request body
+    let pet_id: string;
+    try {
+      const body = await request.json();
+      pet_id = body.pet_id;
+      
+      if (!pet_id) {
+        return new Response(
+          JSON.stringify({ error: 'Missing pet_id parameter' }), 
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    } catch (e) {
+      console.error('Failed to parse request body:', e);
+      return new Response(
+        JSON.stringify({ error: 'Invalid request body' }), 
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
     }
     
-    // Calculate the new view count
-    const currentCount = currentData?.view_count || 0
-    const newCount = currentCount + 1
-    
-    // Directly update with the new count
-    const { data, error } = await supabase
-      .from('pet_uploads')
-      .update({ view_count: newCount })
-      .eq('id', pet_id)
-      .select('view_count')
+    // Simple single-query approach
+    // Use the SQL to directly increment by 1 in a single query
+    const { data, error } = await supabase.rpc('increment_pet_view_count', { 
+      pet_id_param: pet_id 
+    });
     
     if (error) {
-      console.error('Error updating view count:', error)
-      throw error
+      console.error('Error incrementing view count:', error);
+      return new Response(
+        JSON.stringify({ error: 'Database operation failed', details: error.message }), 
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
     }
     
-    return NextResponse.json({ 
-      success: true, 
-      view_count: data && data[0] ? data[0].view_count : newCount 
-    }, { status: 200 })
+    // Get the updated count (if available)
+    const { data: updatedPet, error: fetchError } = await supabase
+      .from('pet_uploads')
+      .select('view_count')
+      .eq('id', pet_id)
+      .single();
+    
+    const updatedCount = updatedPet?.view_count || null;
+    
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        view_count: updatedCount,
+        message: 'View count updated successfully' 
+      }), 
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
   } catch (error) {
-    console.error('Error incrementing view count:', error)
-    return NextResponse.json(
-      { error: 'Failed to increment view count', details: error },
-      { status: 500 }
-    )
+    console.error('Unexpected error in increment-view API:', error);
+    return new Response(
+      JSON.stringify({ error: 'Server error', details: String(error) }), 
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 } 

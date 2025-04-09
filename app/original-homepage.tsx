@@ -91,66 +91,50 @@ export default function Home() {
 
   const handleImageClick = (pet: PetImage) => {
     setSelectedImage(pet);
-    console.log(`Incrementing view count for pet: ${pet.id}`);
     
-    // First update UI immediately to improve perceived performance
+    // First update UI immediately (optimistic update)
     const newViewCount = (pet.view_count || 0) + 1;
-    setPetImages(images => 
-      images.map(p => 
+    
+    // Update local state
+    setPetImages(prevImages => 
+      prevImages.map(p => 
         p.id === pet.id ? { ...p, view_count: newViewCount } : p
       )
     );
+    
+    // Also update the selected image if it's the one being clicked
     setSelectedImage(prev => 
-      prev ? { ...prev, view_count: newViewCount } : null
+      prev && prev.id === pet.id ? { ...prev, view_count: newViewCount } : prev
     );
     
-    // Then send the update to the server
-    fetch('/api/increment-view', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ pet_id: pet.id })
-    })
-    .then(async (response) => {
-      console.log(`View count API response status: ${response.status}`);
-      const responseText = await response.text();
-      console.log(`View count API response body: ${responseText}`);
+    // Simple POST request - minimal options for maximum compatibility
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/increment-view', true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
       
-      // Try to parse the response as JSON if possible
-      try {
-        // Define an interface for the expected response format
-        interface ViewCountResponse {
-          success: boolean;
-          view_count: number;
-          error?: string;
-        }
-        
-        const data = JSON.parse(responseText) as ViewCountResponse;
-        
-        if (response.ok && data.view_count) {
-          console.log(`Server confirmed view count: ${data.view_count}`);
-          // Update with the server's view count if it differs from our optimistic update
-          if (data.view_count !== newViewCount) {
-            setPetImages(images => 
-              images.map(p => 
-                p.id === pet.id ? { ...p, view_count: data.view_count } : p
-              )
-            );
-            setSelectedImage(prev => 
-              prev ? { ...prev, view_count: data.view_count } : null
-            );
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+          console.log(`XHR status: ${xhr.status}, response: ${xhr.responseText}`);
+          
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              console.log('View count updated successfully:', response);
+            } catch (e) {
+              console.error('Failed to parse response:', e);
+            }
+          } else {
+            console.error('Error updating view count:', xhr.statusText);
           }
-        } else {
-          console.error('Error updating view count:', data.error || 'Unknown error');
         }
-      } catch (parseError) {
-        console.error('Error parsing response:', responseText, parseError);
-      }
-    })
-    .catch((err: Error) => {
-      console.error('Network error updating view count:', err);
-    });
+      };
+      
+      xhr.send(JSON.stringify({ pet_id: pet.id }));
+    } catch (err) {
+      console.error('Failed to send view count update:', err);
+      // UI already updated optimistically, so we don't need to revert
+    }
   };
 
   return (
