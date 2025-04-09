@@ -1,0 +1,97 @@
+* 58da5c8 2025-04-09 Revert: Go back to base64 server action upload, remove debug logs
+* a6bdab9 2025-04-08 Debug: Add logs around Buffer.from conversion
+* a33e4a2 2025-04-08 Debug: Add entry log to uploadPetImage server action
+* d3d9e86 2025-04-08 Fix: Remove unused createPetUpload import causing build failure
+* ca107ae 2025-04-08 Refactor: Remove service key usage from server action, use standard client and RLS
+* cff96b6 2025-04-08 Refactor: Remove service key usage from server action, use standard client and RLS
+* d2e943c 2025-04-08 Add specific try-catch around server action call in UploadModal
+* b68647a 2025-04-08 Add robust error handling for server component rendering issues
+* 5057818 2025-04-08 Fix server action serialization error by using base64 strings instead of ArrayBuffer
+* cf63f18 2025-04-08 Fix TypeScript error by creating a new server action file petUploadActions.ts and updating imports
+* eb9bf7e 2025-04-08 Switch to server-side file upload to completely bypass RLS
+* a1c2cba 2025-04-08 Fix TypeScript error in UploadModal status type
+* f3b7799 2025-04-08 Implement server action to bypass RLS for anonymous uploads
+* 910e040 2025-04-08 Fix anonymous uploads with stronger RLS fixes and better error handling
+* 24664c0 2025-04-08 Fix row-level security policy for anonymous uploads
+* 6f0b017 2025-04-08 Drastically improve scrolling detection for Android devices
+* 7662adf 2025-04-08 Fix mobile scrolling sensitivity to prevent accidental image opening
+* d5ef32f 2025-04-08 Fix view count persistence with atomic SQL increments
+* d0fc308 2025-04-08 Fix view count incrementing on Android devices with improved touch handling
+* 2c1be75 2025-04-08 Fix view count incrementing on mobile devices with improved touch handling
+* 8d9335d 2025-04-08 Improve view count batching with more frequent updates and better logging
+* 505c60f 2025-04-08 Allow anonymous inserts into pet_uploads
+* 76a326e 2025-04-08 Fix search_path for increment_view_count function
+* e54930f 2025-04-08 Remove storage test components from admin panel
+* f6daaff 2025-04-08 Refactor image URL generation for consistency and robustness
+* b05d8dc 2025-04-08 Enhance image URL handling to support timestamp-based filenames
+* 80c209a 2025-04-08 Fix image URL handling to support multiple path formats
+* 2dc02f9 2025-04-08 Revert authentication changes to fix Supabase bucket access
+* 185e9c0 2025-04-08 Fix image loading by replacing Next.js Image with standard img tags
+* 2207982 2025-04-08 Fix image handling to prevent optimization issues with Supabase signed URLs
+* 2fcafda 2025-04-08 Fix authentication issue in admin panel by ensuring proper auth context
+* 668b995 2025-04-08 Fix image carousel to properly adapt to photo size
+* cff51c0 2025-04-08 Revert storage policy changes to maintain original path restrictions
+* 2a2eaac 2025-04-08 Update storage policy to allow access to all paths in pet-images bucket
+* 4e316db 2025-04-08 Fix storage bucket name to pet-images
+* 1fa22b4 2025-04-08 Add standalone storage test page
+* e362ffc 2025-04-08 Add Supabase Database type definition
+* 531f7c0 2025-04-08 Fix import path for types in supabaseClient.ts
+* 283746d 2025-04-08 Fix auth headers with singleton Supabase client
+* dc4f068 2025-04-08 Debug storage
+* 3c1e007 2025-04-08 Fix timestamp issue in image URL generation
+* d0117e0 2025-04-08 Add detailed console logging for debugging admin panel and image cache
+* 9cd8c2f 2025-04-08 Fix storage bucket name to pet_uploads
+* 288b9ee 2025-04-08 Fix bucket name from pet-images to pet-uploads
+* e13f836 2025-04-08 Fix: Resolve CORB blocking for images with proper CORS headers
+* bc71a5f 2025-04-08 Fix: Revert admin panel to working version with consolidated code
+* 55e55b0 2025-04-08 Fix: Add CORS headers to resolve 'Response was blocked by CORB' error
+* 5e2f6fc 2025-04-08 Fix: Remove route conflict in admin page by removing route.ts and duplicate files
+* f07da04 2025-04-08 Fix: Resolve routing conflict by separating admin page into server and client components
+* b35c004 2025-04-08 Fix: Implement comprehensive cache prevention for admin page
+* 5ba0151 2025-04-08 Fix: Move cache-control headers from layout to middleware for proper implementation
+* 6a65dbf 2025-04-08 Fix: Add cache-control headers to admin page to prevent caching
+* 0f37074 2025-04-08 Fix: Prevent infinite refreshing with render tracking and safe logging
+* e95b11f 2025-04-08 Fix: Limit middleware to essential routes only to improve performance
+* 300a16b 2025-04-08 Revert: Remove admin check to fix site downtime
+* b63728a 2025-04-08 Add: Secure admin access system with email-based authorization
+* 3f17c18 2025-04-08 Fix: Prevent infinite refreshing with render tracking and safe logging
+* ac041bf 2025-04-08 Fix: Prevent continuous refreshing with strict render control and safe logging
+* 8a7dfe2 2025-04-08 Optimize: Improve image loading with explicit loading attributes and preconnect hints
+* cb7a849 2025-04-08 Fix: Add in-memory caching and optimize image loading to prevent continuous refreshing
+* d76d35b 2025-04-08 Fix: Stop continuous page refreshing by updating useEffect dependencies and optimizing API calls
+* 376849a 2025-04-08 Fix: Set unoptimized=true for all images to prevent 400 Bad Request errors
+* 8223aca 2025-04-08 Fix: Wrap AdminDashboard in Suspense to fix build error with useSearchParams
+* 989e903 2025-04-08 Fix: Add support for public storage URLs and prevent admin page refresh loops
+* 425a4bd 2025-04-08 Feature: Add notification for pending image approval
+* ec659b3 2025-04-08 Fix: Improve pagination to handle excluded images on client side
+* c25423f 2025-04-08 Feature: Implement random selection for images while keeping top view count image first
+* 9abaaa2 2025-04-08 Fix: Improve image loading to handle Supabase signed URLs
+* d82bd6d 2025-04-08 Fix: Update sorting parameter to use supported nullsFirst: false
+* 629bc82 2025-04-08 Fix: Sort images by created date instead of view count to show all approved images
+* b4f1593 2025-04-08 Fix: Add image_url when uploading images to satisfy database constraint
+* 6182ece 2025-04-08 Fix: Update type handling in console.log statement
+* 8926582 2025-04-08 Fix: Show all approved images regardless of view count
+* bf4ad83 2025-04-08 Fix: Add critters package for CSS optimization
+* 12ba240 2025-04-08 Fix: Update next.config.js optimizePackageImports to use array instead of boolean
+* ba51c02 2025-04-08 Fix: Remove refresh button and simplify image loading
+* 2e1e17e 2025-04-08 Optimize: Implement comprehensive caching strategy to reduce egress usage
+* 25beb4c 2025-04-08 Fix: Update original-homepage to match new UploadModal interface
+* 75f071a 2025-04-08 Optimize: Implement pagination and image resizing to reduce egress usage
+* 0520a9a 2025-04-08 Fix: Add refresh mechanism for new photos from admin panel
+* 79db320 2025-04-08 Fix: Ensure pet information updates correctly when navigating slider on Android
+* 8c0323f 2025-04-08 UX: Improve image click detection to avoid accidental clicks while scrolling
+* 2bde680 2025-04-08 Feature: Add Instagram-style image slider to modal
+* 85527d2 2025-04-07 Refactor: Rely solely on RPC for view count increment and confirm update
+* 95bc181 2025-04-07 Fix: Complete overhaul of view count system with better event handling
+* c6ece5d 2025-04-07 Fix: Simplify view count logic and ensure persistence
+* 7e1d032 2025-04-07 Fix: Ensure view counts persist after page refresh with periodic data refresh
+* ce63f1e 2025-04-07 Fix: Use direct database update for view counts instead of RPC function
+* 6eec6a5 2025-04-07 Fix: Add current view count check before incrementing
+* aa26158 2025-04-07 Fix: Simplify view count update logic and ensure proper initialization
+* 42109ea 2025-04-07 Fix: Improve view count persistence with better error handling and logging
+* 90d745d 2025-04-07 Fix: Add touch event handlers to main image for mobile view counts
+* 703c1fd 2025-04-07 Fix: Use database function for view count updates
+* 1bd1999 2025-04-07 Fix: Improve view count handling to ensure proper updates
+* a192e78 2025-04-07 Fix: Improve mobile touch event handling for view counts
+* a7bfcad 2025-04-07 Fix: Improve view count persistence
+* 6fd3156 2025

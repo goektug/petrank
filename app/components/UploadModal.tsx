@@ -127,36 +127,39 @@ export default function UploadModal({ onClose, file, onSuccess }: UploadModalPro
         throw new Error('Failed to generate public URL for the image')
       }
       
-      // Insert metadata into database
-      const { error: insertError } = await supabase
-        .from('pet_uploads')
-        .insert({
+      // Instead of direct insert, use our server API endpoint
+      const response = await fetch('/api/pet-upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           id,
           pet_name: petName,
           age,
           gender,
           social_media_link: socialMediaLink || null,
           file_path: filePath,
-          image_url: imageUrl,
-          status: 'pending',
-          view_count: 0
+          image_url: imageUrl
         })
-        
-      if (insertError) {
-        throw insertError
-      }
+      })
       
-      // Call onSuccess if provided to notify parent component
-      if (onSuccess) {
-        onSuccess()
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to insert pet data')
       }
       
       setSuccess(true)
-      setTimeout(onClose, 2000)
+      if (onSuccess) onSuccess()
       
-    } catch (err: any) {
-      console.error('Upload error:', err)
-      setError(err.message || 'An error occurred during upload')
+      // Auto close after success
+      setTimeout(() => {
+        onClose()
+      }, 2000)
+      
+    } catch (error) {
+      console.error('Upload error:', error)
+      setError(error instanceof Error ? error.message : 'An unknown error occurred')
     } finally {
       setIsUploading(false)
     }

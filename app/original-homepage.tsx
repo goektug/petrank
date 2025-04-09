@@ -92,28 +92,34 @@ export default function Home() {
   const handleImageClick = (pet: PetImage) => {
     setSelectedImage(pet)
     
-    // Update view count
-    supabase
-      .from('pet_uploads')
-      .update({ 
-        view_count: (pet.view_count || 0) + 1 
-      })
-      .eq('id', pet.id)
-      .then(({ error }) => {
-        if (error) {
-          console.error('Error updating view count:', error)
-        } else {
-          // Update local state with new view count
-          setPetImages(images => 
-            images.map(p => 
-              p.id === pet.id ? { ...p, view_count: (p.view_count || 0) + 1 } : p
-            )
+    // Update view count using the API endpoint
+    fetch('/api/increment-view', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ pet_id: pet.id })
+    })
+    .then(async (response) => {
+      if (response.ok) {
+        const data = await response.json()
+        
+        // Update local state with new view count
+        setPetImages(images => 
+          images.map(p => 
+            p.id === pet.id ? { ...p, view_count: data.view_count || (p.view_count || 0) + 1 } : p
           )
-          setSelectedImage(prev => 
-            prev ? { ...prev, view_count: (prev.view_count || 0) + 1 } : null
-          )
-        }
-      })
+        )
+        setSelectedImage(prev => 
+          prev ? { ...prev, view_count: data.view_count || (prev.view_count || 0) + 1 } : null
+        )
+      } else {
+        console.error('Error updating view count')
+      }
+    })
+    .catch((err: Error) => {
+      console.error('Error updating view count:', err)
+    })
   }
 
   return (

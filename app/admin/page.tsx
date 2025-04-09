@@ -43,61 +43,114 @@ function AdminDashboard() {
   }, [searchParams])
 
   const fetchPendingUploads = async () => {
+    console.log('Fetching uploads for admin...'); // Log start
     try {
-      setLoading(true)
-      setError(null)
+      setLoading(true);
+      setError(null);
 
-      const { data: uploads, error } = await supabase
-        .from('pet_uploads')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-
-      if (!uploads || uploads.length === 0) {
-        setPendingUploads([])
-        return
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData?.session) {
+          console.error('Admin: No active session found!', sessionError);
+          setError('Not authenticated');
+          setLoading(false);
+          return;
       }
+      console.log('Admin: User session retrieved.');
 
-      // Get fresh signed URLs for all images using our cache system
+      // Explicitly fetch ALL statuses for debugging
+      const { data: uploads, error: fetchError } = await supabase
+        .from('pet_uploads')
+        .select('id, pet_name, status, created_at, file_path') // Select specific columns
+        .order('created_at', { ascending: false });
+
+      // Log the raw response from Supabase
+      console.log('Admin: Raw data fetched from Supabase:', uploads);
+      console.error('Admin: Fetch error (if any):', fetchError);
+
+      if (fetchError) throw fetchError;
+
+      if (!uploads) {
+        console.log('Admin: No uploads data returned.');
+        setPendingUploads([]);
+        setLoading(false);
+        return;
+      }
+      
+      console.log(`Admin: Fetched ${uploads.length} total uploads. Processing...`);
+
+      // Keep all fetched uploads for now, don't filter client-side yet
       const updatedUploads = await Promise.all(uploads.map(async (upload) => {
         if (!upload.file_path) {
-          return upload
+          return upload;
         }
-
-        const signedUrl = await getCachedImageUrl(upload.file_path, upload.id)
+        // Ensure image_url is added even if not selected initially
+        const signedUrl = await getCachedImageUrl(upload.file_path, upload.id);
         return {
           ...upload,
-          image_url: signedUrl || upload.image_url
-        }
-      }))
+          image_url: signedUrl || '' // Add image_url field
+        };
+      }));
 
-      setPendingUploads(updatedUploads)
+      console.log('Admin: Processed uploads with URLs:', updatedUploads);
+      setPendingUploads(updatedUploads as PetUpload[]); // Cast to expected type
+
     } catch (err) {
-      setError('Failed to load uploads')
+      console.error('Admin: Error in fetchPendingUploads:', err);
+      setError('Failed to load uploads');
     } finally {
-      setLoading(false)
+      setLoading(false);
+      console.log('Admin: Fetching complete.');
     }
-  }
+  };
 
   const handleAction = async (id: string, action: 'approve' | 'reject') => {
+    console.log(`%c[handleAction] Start: Action='${action}', ID='${id}'`, 'color: blue; font-weight: bold;');
+    setError(null);
+    const targetElement = document.querySelector(`[data-pet-id='${id}'] button`); // Find the button related to this pet
+    if (targetElement) (targetElement as HTMLButtonElement).disabled = true; // Disable button
+
     try {
-      setError(null)
-      
-      const { error } = await supabase
+      const newStatus = action === 'approve' ? 'approved' : 'rejected';
+      console.log(`[handleAction] Preparing to update status to: '${newStatus}'`);
+
+      const { data, error } = await supabase
         .from('pet_uploads')
-        .update({ status: action === 'approve' ? 'approved' : 'rejected' })
+        .update({ status: newStatus })
         .eq('id', id)
-        .select()
+        .select(); // Important: Select to see the result
 
-      if (error) throw error
+      // Log the raw result
+      console.log('[handleAction] Supabase update response:', { data, error });
 
-      // Refresh the list
-      await fetchPendingUploads()
+      if (error) {
+        console.error('%c[handleAction] Supabase Update Error:', 'color: red; font-weight: bold;', error);
+        // Attempt to parse Supabase error details
+        let errorMessage = `Failed to ${action} upload.`;
+        if (error.message) errorMessage += ` Message: ${error.message}`;
+        if (error.details) errorMessage += ` Details: ${error.details}`;
+        if (error.hint) errorMessage += ` Hint: ${error.hint}`;
+        setError(errorMessage);
+        // Re-enable button on error
+        if (targetElement) (targetElement as HTMLButtonElement).disabled = false;
+        return; // Stop execution if there was an error
+      }
+
+      console.log(`%c[handleAction] Update successful for ID='${id}'. Data:`, 'color: green;', data);
+      
+      // Refresh the list *after* successful update
+      console.log('[handleAction] Refreshing list...');
+      await fetchPendingUploads();
+      console.log('[handleAction] List refreshed.');
+
     } catch (err) {
-      setError(`Failed to ${action} upload`)
+      // Catch any other unexpected errors
+      console.error('%c[handleAction] Unexpected Error:', 'color: red; font-weight: bold;', err);
+      setError(`An unexpected error occurred during ${action}.`);
+      // Re-enable button on error
+      if (targetElement) (targetElement as HTMLButtonElement).disabled = false;
     }
-  }
+    // Note: Button remains disabled on success until list refresh potentially removes it
+  };
 
   const handleSignOut = async () => {
     try {
@@ -161,7 +214,7 @@ function AdminDashboard() {
             <p className="text-gray-500">No uploads found</p>
           ) : (
             pendingUploads.map((upload) => (
-              <div key={upload.id} className="border rounded-lg p-4">
+              <div key={upload.id} className="border rounded-lg p-4" data-pet-id={upload.id}>
                 {upload.image_url ? (
                   <div className="relative w-full h-48 mb-4">
                     <Image 
