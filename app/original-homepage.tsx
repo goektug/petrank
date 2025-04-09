@@ -110,8 +110,9 @@ export default function Home() {
     // Use a simple image "ping" method that works on all browsers
     // This approach has extremely high compatibility
     const trackingPixel = new Image();
-    trackingPixel.onload = () => console.log('View count update successful');
-    trackingPixel.onerror = () => console.log('View count update error');
+    trackingPixel.onload = () => console.log('View count update successful via ping');
+    trackingPixel.onerror = () => console.log('View count update error via ping');
+    // Add a timestamp to prevent caching issues
     trackingPixel.src = `/api/ping-view?id=${encodeURIComponent(pet.id)}&t=${new Date().getTime()}`;
   };
 
@@ -226,7 +227,7 @@ export default function Home() {
         )
       )}
 
-      {/* Image Preview Modal */}
+      {/* Image Preview Modal - Reverted to original structure */}
       {selectedImage && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50"
@@ -237,11 +238,11 @@ export default function Home() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="relative">
+              {/* Original image styling before max-height attempts */}
               <img
                 src={selectedImage.image_url}
                 alt={selectedImage.pet_name}
-                className="w-full object-contain"
-                style={{ maxHeight: '70vh' }}
+                className="w-full h-[500px] object-contain bg-black" // Reverted to fixed height and black bg
               />
               <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded">
                 👁 {selectedImage.view_count || 0} views
