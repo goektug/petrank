@@ -77,6 +77,7 @@ function HomeContent() {
   // Track renders to debug continuous reloading
   const renderCount = useRef(0);
   const hasInitiallyLoaded = useRef(false);
+  const imagesLoadedOnce = useRef(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [currentFile, setCurrentFile] = useState<File | null>(null)
@@ -407,29 +408,48 @@ function HomeContent() {
     }
   }
 
-  // Always fetch images when component mounts, but only once
+  // Load images only on initial mount, unless refreshed
   useEffect(() => {
-    // Skip if already loaded or currently loading
-    if (hasInitiallyLoaded.current || isLoading) {
-      console.log('Skipping fetchImages - already loaded or currently loading');
-      return;
+    // Check for refresh parameter and force data refresh
+    const refresh = searchParams.get('refresh')
+    if (refresh === 'true') {
+      console.log('Refresh parameter detected, forcing data refresh')
+      // Remove the refresh parameter from the URL
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('refresh')
+      window.history.replaceState({}, '', newUrl)
+      // Explicitly reset the flag to allow refetching
+      imagesLoadedOnce.current = false; 
     }
     
-    let isMounted = true;
-    
-    if (!isProcessingAuth && isMounted) {
-      // Always fetch from page 1 on initial load
-      console.log('Initial fetch of images');
-      fetchImages(1);
-      
-      // Mark as loaded
-      hasInitiallyLoaded.current = true;
+    // Prevent fetching if already loaded in this component instance
+    if (imagesLoadedOnce.current) {
+      console.log('Skipping fetchImages - already loaded or currently loading')
+      return; 
     }
-    
+
+    // Mark as loading started for this instance
+    imagesLoadedOnce.current = true;
+
+    // Fetch images
+    console.log('Initial fetchImages trigger');
+    fetchTotalCount().then(count => {
+      console.log(`Initial fetch: Total count is ${count}`);
+      setTotalCount(count)
+      if (count > 0) {
+        fetchImages(1); // Load first page
+      } else {
+         setPetImages([]); // Ensure empty state if count is 0
+         setHasMore(false);
+      }
+    });
+
+    // Cleanup function: Reset the flag when the component unmounts
     return () => {
-      isMounted = false;
+      console.log('HomeContent unmounting, resetting imagesLoadedOnce flag.');
+      imagesLoadedOnce.current = false;
     };
-  }, [isProcessingAuth, fetchImages, isLoading]); // Include fetchImages in dependencies
+  }, [searchParams]); // Add searchParams to dependencies to re-run if refresh param appears
 
   const handleFileDrop = (acceptedFiles: File[]) => {
     setUploadedFiles(acceptedFiles)
