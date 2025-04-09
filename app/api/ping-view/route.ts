@@ -7,11 +7,6 @@ const TRANSPARENT_GIF = Buffer.from(
   'base64'
 );
 
-// Create a client that uses the service role key for admin-level database operations
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
 export async function GET(request: Request) {
   // Extract the pet ID from the URL query parameter
   const url = new URL(request.url);
@@ -35,6 +30,26 @@ export async function GET(request: Request) {
   }
   
   try {
+    // Create Supabase client inside the handler
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('Missing Supabase URL or service key');
+      // Still return the pixel even if we can't update the count
+      return new NextResponse(TRANSPARENT_GIF, {
+        status: 200,
+        headers: {
+          'Content-Type': 'image/gif',
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      });
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
     // Attempt to update the view count in the database
     // Using the simplest, most reliable approach
     const { data, error } = await supabase
