@@ -227,20 +227,21 @@ export default function Home() {
         )
       )}
 
-      {/* Image Preview Modal - Floating image over info box */}
+      {/* Image Preview Modal - Compact design for mobile */}
       {selectedImage && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50"
           onClick={() => setSelectedImage(null)}
         >
-          {/* Container for positioning the floating elements */}
-          <div className="relative" onClick={(e) => e.stopPropagation()}>
-            {/* The image floats above with no background */}
-            <div className="relative z-10 mb-[-60px]"> {/* Negative margin for overlap */}
+          {/* Constrain height to ensure everything fits on screen */}
+          <div className="relative max-h-[85vh] flex flex-col items-center overflow-hidden" 
+               onClick={(e) => e.stopPropagation()}>
+            {/* Image container with reduced negative margin */}
+            <div className="relative z-10 mb-[-20px]"> 
               <img
                 src={selectedImage.image_url}
                 alt={selectedImage.pet_name}
-                className="max-h-[70vh] max-w-[90vw] md:max-w-lg object-contain shadow-lg rounded-lg"
+                className="max-h-[55vh] max-w-[90vw] md:max-w-lg object-contain shadow-lg rounded-lg"
               />
               {/* View count overlay */}
               <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-sm">
@@ -248,10 +249,10 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Information box with white background */}
-            <div className="bg-white rounded-lg pt-16 px-6 pb-6 shadow-lg max-w-lg mx-auto">
-              <h2 className="text-xl font-bold mb-2 text-center">{selectedImage.pet_name}</h2>
-              <div className="space-y-2">
+            {/* Compacted info box with less padding */}
+            <div className="bg-white rounded-lg pt-8 px-4 pb-4 shadow-lg max-w-lg w-full overflow-y-auto">
+              <h2 className="text-xl font-bold mb-1 text-center">{selectedImage.pet_name}</h2>
+              <div className="space-y-1 text-sm">
                 <p className="text-gray-700">Age: {selectedImage.age}</p>
                 <p className="text-gray-700">Gender: {selectedImage.gender}</p>
                 {selectedImage.social_media_link && (
@@ -267,8 +268,10 @@ export default function Home() {
                   </p>
                 )}
               </div>
+              
+              {/* Position the close button higher and with less margin */}
               <button
-                className="mt-4 w-full bg-gray-200 px-4 py-2 rounded hover:bg-gray-300"
+                className="mt-2 w-full bg-gray-200 px-4 py-2 rounded hover:bg-gray-300 text-sm mb-safe"
                 onClick={() => setSelectedImage(null)}
               >
                 Close
