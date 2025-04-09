@@ -200,9 +200,10 @@ export default function UploadModal({ onClose, file, onSuccess }: UploadModalPro
       }
 
       const petId = result.data?.[0]?.id || id;
-      console.log("Redirecting to pet page with ID:", petId);
+      console.log("Upload successful for pet ID:", petId);
       console.log("Full API response data:", result.data);
-      router.push(`/p/${petId}`);
+      // Redirect to homepage with highlight parameter instead of non-existent pet page
+      router.push(`/?highlight=${petId}`);
       
       setSuccess(true);
       if (onSuccess) onSuccess();

@@ -22,6 +22,19 @@ const notificationStyles = `
       opacity: 1;
     }
   }
+  
+  @keyframes highlightPulse {
+    0%, 100% {
+      box-shadow: 0 0 0 rgba(59, 130, 246, 0);
+    }
+    50% {
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.7);
+    }
+  }
+  
+  .highlight-animation {
+    animation: highlightPulse 1.5s ease-in-out 2;
+  }
 `;
 
 interface PetImage {
@@ -422,6 +435,21 @@ function HomeContent() {
       imagesLoadedOnce.current = false; 
     }
     
+    // Check for highlighted pet parameter
+    const highlightedPetId = searchParams.get('highlight')
+    if (highlightedPetId) {
+      console.log(`Highlight parameter detected for pet ID: ${highlightedPetId}`)
+      // Show upload success notification
+      setShowUploadSuccessNotification(true)
+      
+      // Remove the highlight parameter from the URL to prevent re-triggering
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('highlight')
+      window.history.replaceState({}, '', newUrl)
+      
+      // We'll look for this pet ID in the data after loading
+    }
+    
     // Prevent fetching if already loaded in this component instance
     if (imagesLoadedOnce.current) {
       console.log('Skipping fetchImages - already loaded or currently loading')
@@ -437,13 +465,29 @@ function HomeContent() {
       console.log(`Initial fetch: Total count is ${count}`);
       setTotalCount(count)
       if (count > 0) {
-        fetchImages(1); // Load first page
+        fetchImages(1).then(() => {
+          // After images are loaded, check if there's a highlighted pet to find
+          const highlightedPetId = searchParams.get('highlight')
+          if (highlightedPetId) {
+            // Find the pet in the loaded data
+            setTimeout(() => {
+              const petElement = document.getElementById(`pet-${highlightedPetId}`)
+              if (petElement) {
+                petElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                petElement.classList.add('highlight-animation')
+                setTimeout(() => {
+                  petElement?.classList.remove('highlight-animation')
+                }, 3000)
+              }
+            }, 500) // Small delay to ensure DOM is updated
+          }
+        });
       } else {
          setPetImages([]); // Ensure empty state if count is 0
          setHasMore(false);
       }
     });
-
+    
     // Cleanup function: Reset the flag when the component unmounts
     return () => {
       console.log('HomeContent unmounting, resetting imagesLoadedOnce flag.');
@@ -622,6 +666,7 @@ function HomeContent() {
       {petImages.length > 0 && petImages[0] && (
         <div className="mb-8">
           <div 
+            id={`pet-${petImages[0].id}`}
             className="relative bg-white rounded-lg shadow-lg overflow-hidden cursor-pointer transform transition-transform hover:scale-105 mx-auto max-w-4xl"
             onClick={(e) => handleClick(e, petImages[0], 0)}
             onMouseDown={handleMouseDown}
@@ -687,7 +732,8 @@ function HomeContent() {
               const originalIndex = idx + 1;
               return (
                 <div 
-                  key={pet.id} 
+                  key={pet.id}
+                  id={`pet-${pet.id}`}
                   className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer transform transition-transform hover:scale-105"
                   onClick={(e) => handleClick(e, pet, originalIndex)}
                   onMouseDown={handleMouseDown}
@@ -885,10 +931,18 @@ function HomeContent() {
       )}
 
       {showNotification && (
-        <Notification
-          message="Your pet's image is waiting approval" 
-          subMessage="We'll review your submission shortly."
-          onClose={() => setShowNotification(false)}
+        <Notification 
+          message="View count updated!" 
+          subMessage="Changes may take a moment to appear"
+          onClose={() => setShowNotification(false)} 
+        />
+      )}
+
+      {showUploadSuccessNotification && (
+        <Notification 
+          message="Pet uploaded successfully!" 
+          subMessage="Your pet is awaiting approval"
+          onClose={() => setShowUploadSuccessNotification(false)} 
         />
       )}
     </main>
