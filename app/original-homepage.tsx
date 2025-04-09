@@ -227,32 +227,32 @@ export default function Home() {
         )
       )}
 
-      {/* Image Preview Modal - Reducing overlay darkness */}
+      {/* Image Preview Modal - Attempt 2 for tight fit */}
       {selectedImage && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
-          onClick={() => setSelectedImage(null)}
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50" 
+          onClick={() => setSelectedImage(null)} // Click outside closes
         >
-          {/* Use inline-block to allow the container to shrink to content size, up to max-w */}
+          {/* Inner container for content, prevent clicks closing modal */}
           <div 
-            className="bg-white rounded-lg overflow-hidden inline-block align-middle max-w-4xl max-h-[90vh]"
-            onClick={(e) => e.stopPropagation()} // Prevent clicks inside from closing modal
+            className="flex flex-col max-w-4xl max-h-[90vh] w-auto"
+            onClick={(e) => e.stopPropagation()} 
           >
-            {/* Image container */}
-            <div className="relative">
+            {/* Image: Constrained height/width, white background applied here */}
+            <div className="bg-white rounded-t-lg overflow-hidden">
               <img
                 src={selectedImage.image_url}
                 alt={selectedImage.pet_name}
-                // Let image dictate size, constrained by viewport height and container width
-                className="block object-contain max-w-full max-h-[80vh]" 
+                className="block object-contain max-w-full max-h-[75vh]" // Adjusted max-h slightly
               />
-              {/* View count overlay */}
+              {/* View count overlay - Stays relative to image */}
               <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-white text-sm px-2 py-1 rounded">
                 👁 {selectedImage.view_count || 0} views
               </div>
             </div>
-            {/* Details section below image */}
-            <div className="p-4">
+
+            {/* Details section: White background, rounded bottom */}
+            <div className="bg-white rounded-b-lg p-4 w-full">
               <h2 className="text-xl font-bold mb-2">{selectedImage.pet_name}</h2>
               <div className="text-sm space-y-1">
                 <p className="text-gray-700">Age: {selectedImage.age}</p>
@@ -270,7 +270,6 @@ export default function Home() {
                   </p>
                 )}
               </div>
-              {/* Close button remains accessible */}
               <button
                 className="mt-3 w-full bg-gray-200 px-4 py-2 rounded text-sm font-medium hover:bg-gray-300"
                 onClick={() => setSelectedImage(null)}
