@@ -15,16 +15,16 @@ export async function POST(request: Request) {
       pet_id = body.pet_id;
       
       if (!pet_id) {
-        return new Response(
-          JSON.stringify({ error: 'Missing pet_id parameter' }), 
-          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        return NextResponse.json(
+          { success: false, error: 'Missing pet_id parameter' },
+          { status: 400 }
         );
       }
     } catch (e) {
       console.error('Failed to parse request body:', e);
-      return new Response(
-        JSON.stringify({ error: 'Invalid request body' }), 
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      return NextResponse.json(
+        { success: false, error: 'Invalid request body' },
+        { status: 400 }
       );
     }
     
@@ -36,9 +36,9 @@ export async function POST(request: Request) {
     
     if (error) {
       console.error('Error incrementing view count:', error);
-      return new Response(
-        JSON.stringify({ error: 'Database operation failed', details: error.message }), 
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      return NextResponse.json(
+        { success: false, error: 'Database operation failed', details: error.message },
+        { status: 500 }
       );
     }
     
@@ -51,19 +51,19 @@ export async function POST(request: Request) {
     
     const updatedCount = updatedPet?.view_count || null;
     
-    return new Response(
-      JSON.stringify({ 
+    return NextResponse.json(
+      { 
         success: true, 
         view_count: updatedCount,
-        message: 'View count updated successfully' 
-      }), 
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
+        message: 'View count updated successfully'
+      },
+      { status: 200 }
     );
   } catch (error) {
     console.error('Unexpected error in increment-view API:', error);
-    return new Response(
-      JSON.stringify({ error: 'Server error', details: String(error) }), 
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    return NextResponse.json(
+      { success: false, error: 'Server error', details: String(error) },
+      { status: 500 }
     );
   }
 } 
