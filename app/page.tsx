@@ -512,16 +512,54 @@ function HomeContent() {
     }
   }
 
-  // Modified handleImageClick - ONLY handles opening the modal now
-  const handleImageClick = useCallback((pet: PetImage, index: number) => {
-    console.log('Image clicked, opening modal for:', pet.id, 'at index:', index)
+  // Modified handleImageClick - Handles modal opening AND triggers view count API
+  const handleImageClick = useCallback(async (pet: PetImage, index: number) => {
+    console.log('Image clicked, opening modal & incrementing count for:', pet.id, 'at index:', index)
     setSelectedImage(pet)
     setSelectedImageIndex(index)
     
-    // View count is now handled SOLELY by the tracking pixel (/api/ping-view)
-    // NO API call or optimistic update here anymore
+    // Call API to increment view count on click
+    try {
+      // Optimistically update the UI right away (optional, but gives immediate feedback)
+      setPetImages(images => 
+        images.map(p => 
+          p.id === pet.id ? { ...p, view_count: (p.view_count || 0) + 1 } : p
+        )
+      )
+      
+      const response = await fetch('/api/increment-view', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ pet_id: pet.id }),
+      });
+      
+      if (!response.ok) {
+        // Log error but don't revert optimistic update immediately
+        console.error('Failed to persist view count increment:', await response.text());
+        // Consider adding user feedback or reverting optimistic update after a delay if needed
+        return; 
+      }
+      
+      const result = await response.json();
+      
+      if (result.success && result.view_count !== undefined) {
+        console.log(`View count successfully persisted to ${result.view_count}`);
+        // Update UI with confirmed count from server to ensure consistency
+        setPetImages(images => 
+          images.map(p => 
+            p.id === pet.id ? { ...p, view_count: result.view_count } : p
+          )
+        )
+      } else if (!result.success) {
+        console.error('API reported failure incrementing view count:', result.error);
+      }
+    } catch (error) {
+      console.error('Error calling increment-view API:', error);
+    }
 
-  }, []) // Removed dependencies related to view count update
+  }, []) // Dependencies might be needed if state other than setPetImages is used inside
 
   // Modified touch event handler for mobile devices
   const handleTouchStart = (e: React.TouchEvent, pet: PetImage) => {
@@ -668,14 +706,6 @@ function HomeContent() {
                       }
                     }}
                   />
-                  {/* Add tracking pixel for Android compatibility */}
-                  <img 
-                    src={`/api/ping-view?id=${petImages[0].id}&t=${Date.now()}`} 
-                    alt="" 
-                    width="1" 
-                    height="1" 
-                    style={{ position: 'absolute', bottom: 0, right: 0, opacity: 0.01 }} 
-                  />
                 </div>
                 <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-2 text-lg rounded-full">
                   👁 {petImages[0].view_count || 0}
@@ -740,14 +770,6 @@ function HomeContent() {
                               }
                             }
                           }}
-                        />
-                        {/* Add tracking pixel for Android compatibility */}
-                        <img 
-                          src={`/api/ping-view?id=${pet.id}&t=${Date.now()}`} 
-                          alt="" 
-                          width="1" 
-                          height="1" 
-                          style={{ position: 'absolute', bottom: 0, right: 0, opacity: 0.01 }} 
                         />
                       </div>
                       <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 text-sm rounded-full">
@@ -853,16 +875,6 @@ function HomeContent() {
                           }
                         }
                       }}
-                    />
-                  )}
-                  {/* Add tracking pixel for modal view */}
-                  {selectedImage.id && (
-                    <img 
-                      src={`/api/ping-view?id=${selectedImage.id}&t=${Date.now()}&modal=1`} 
-                      alt="" 
-                      width="1" 
-                      height="1" 
-                      style={{ position: 'absolute', bottom: 0, right: 0, opacity: 0.01 }} 
                     />
                   )}
                 </div>
