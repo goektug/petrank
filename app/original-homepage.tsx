@@ -227,10 +227,10 @@ export default function Home() {
         )
       )}
 
-      {/* Image Preview Modal - Attempting tight fit */}
+      {/* Image Preview Modal - Reducing overlay darkness */}
       {selectedImage && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50"
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
           onClick={() => setSelectedImage(null)}
         >
           {/* Use inline-block to allow the container to shrink to content size, up to max-w */}
