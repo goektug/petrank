@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { v4 as uuidv4 } from 'uuid'
+import { useRouter } from 'next/navigation'
 
 interface UploadModalProps {
   onClose: () => void
@@ -20,6 +21,7 @@ export default function UploadModal({ onClose, file, onSuccess }: UploadModalPro
   const [success, setSuccess] = useState(false)
 
   const supabase = createClientComponentClient()
+  const router = useRouter()
 
   // Function to resize an image to reduce file size
   const resizeImage = async (file: File, maxWidth: number = 1200, maxHeight: number = 1200, quality: number = 0.8): Promise<Blob> => {
@@ -84,6 +86,17 @@ export default function UploadModal({ onClose, file, onSuccess }: UploadModalPro
       return
     }
     
+    // Add validation for social media link if provided
+    if (socialMediaLink) {
+      try {
+        // Attempt to create a URL object to validate format
+        new URL(socialMediaLink);
+      } catch (e) {
+        setError('Please enter a valid URL for social media link (include https://)')
+        return
+      }
+    }
+    
     try {
       setIsUploading(true)
       setError(null)
@@ -141,21 +154,50 @@ export default function UploadModal({ onClose, file, onSuccess }: UploadModalPro
           social_media_link: socialMediaLink || null,
           file_path: filePath,
           image_url: imageUrl
-        })
+        }),
       })
-      
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to insert pet data')
+        let errorMessage = 'Failed to upload pet';
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch (jsonError) {
+          // If JSON parsing fails, use status text or a default message
+          errorMessage = response.statusText || 'Error processing response from server';
+          console.error('JSON parsing error:', jsonError);
+        }
+        throw new Error(errorMessage);
       }
+
+      let result;
+      try {
+        result = await response.json();
+      } catch (jsonError) {
+        console.error('Error parsing response:', jsonError);
+        setError('Server returned an invalid response. Please try again.');
+        setIsUploading(false);
+        return;
+      }
+
+      if (!result.success) {
+        setError(result.error || 'Upload failed with an unknown error');
+        setIsUploading(false);
+        return;
+      }
+
+      const petId = result.data?.[0]?.id || id;
+      router.push(`/p/${petId}`);
       
-      setSuccess(true)
-      if (onSuccess) onSuccess()
+      setSuccess(true);
+      if (onSuccess) onSuccess();
       
       // Auto close after success
       setTimeout(() => {
-        onClose()
-      }, 2000)
+        onClose();
+      }, 2000);
       
     } catch (error) {
       console.error('Upload error:', error)

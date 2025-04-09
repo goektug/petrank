@@ -1,48 +1,65 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { createClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
-export async function POST(request: Request) {
-  const body = await request.json()
-  const { id, pet_name, age, gender, social_media_link, file_path, image_url } = body
-  
-  // Create a service role client that bypasses RLS
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    }
-  )
+export async function POST(req: Request) {
+  let body;
   
   try {
-    // Insert using the admin client that bypasses RLS
-    const { data, error } = await supabaseAdmin
+    body = await req.json()
+  } catch (error) {
+    console.error('Error parsing JSON request:', error)
+    return NextResponse.json(
+      { success: false, error: 'Invalid JSON in request body' },
+      { status: 400 }
+    )
+  }
+
+  // Check required fields
+  if (!body.id || !body.pet_name || !body.age || !body.gender || !body.file_path) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Missing required fields (id, pet_name, age, gender, file_path)'
+      },
+      { status: 400 }
+    )
+  }
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  try {
+    const { data, error } = await supabase
       .from('pet_uploads')
       .insert({
-        id,
-        pet_name,
-        age, 
-        gender,
-        social_media_link: social_media_link || null,
-        file_path,
-        image_url,
-        status: 'pending',
-        view_count: 0
+        id: body.id,
+        pet_name: body.pet_name,
+        age: body.age,
+        gender: body.gender,
+        social_media_link: body.social_media_link || null,
+        file_path: body.file_path,
+        image_url: body.image_url || null
       })
       .select()
-    
-    if (error) throw error
-    
-    return NextResponse.json({ success: true, data }, { status: 200 })
-  } catch (error) {
-    console.error('Error inserting pet upload:', error)
+
+    if (error) {
+      console.error('Supabase insert error:', error)
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 500 }
+      )
+    }
+
     return NextResponse.json(
-      { error: 'Failed to add pet upload', details: error },
+      { success: true, data },
+      { status: 200 }
+    )
+  } catch (error) {
+    console.error('Server error during pet upload:', error)
+    return NextResponse.json(
+      { success: false, error: 'Server error processing upload' },
       { status: 500 }
     )
   }
