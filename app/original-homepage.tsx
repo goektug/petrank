@@ -227,29 +227,30 @@ export default function Home() {
         )
       )}
 
-      {/* Image Preview Modal - Black background removed from image container */}
+      {/* Image Preview Modal - Floating image over info box */}
       {selectedImage && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50"
+          className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50"
           onClick={() => setSelectedImage(null)}
         >
-          <div 
-            className="bg-white rounded-lg max-w-4xl w-full overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="relative">
+          {/* Container for positioning the floating elements */}
+          <div className="relative" onClick={(e) => e.stopPropagation()}>
+            {/* The image floats above with no background */}
+            <div className="relative z-10 mb-[-60px]"> {/* Negative margin for overlap */}
               <img
                 src={selectedImage.image_url}
                 alt={selectedImage.pet_name}
-                // Changed from 'bg-black' to no background (white by default)
-                className="w-full h-[500px] object-contain" 
+                className="max-h-[70vh] max-w-[90vw] md:max-w-lg object-contain shadow-lg rounded-lg"
               />
-              <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded">
+              {/* View count overlay */}
+              <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-sm">
                 👁 {selectedImage.view_count || 0} views
               </div>
             </div>
-            <div className="p-6">
-              <h2 className="text-2xl font-bold mb-4">{selectedImage.pet_name}</h2>
+
+            {/* Information box with white background */}
+            <div className="bg-white rounded-lg pt-16 px-6 pb-6 shadow-lg max-w-lg mx-auto">
+              <h2 className="text-xl font-bold mb-2 text-center">{selectedImage.pet_name}</h2>
               <div className="space-y-2">
                 <p className="text-gray-700">Age: {selectedImage.age}</p>
                 <p className="text-gray-700">Gender: {selectedImage.gender}</p>
@@ -259,7 +260,7 @@ export default function Home() {
                       href={selectedImage.social_media_link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-500 hover:text-blue-700"
+                      className="text-blue-500 hover:underline"
                     >
                       Visit Social Media
                     </a>
@@ -267,7 +268,7 @@ export default function Home() {
                 )}
               </div>
               <button
-                className="mt-4 bg-gray-200 px-4 py-2 rounded hover:bg-gray-300"
+                className="mt-4 w-full bg-gray-200 px-4 py-2 rounded hover:bg-gray-300"
                 onClick={() => setSelectedImage(null)}
               >
                 Close
