@@ -1,69 +1,76 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
-// Create a basic client that doesn't rely on cookies
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Constants for the 1x1 transparent GIF response
+const gifData = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+const gifHeaders = {
+  'Content-Type': 'image/gif',
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0'
+};
 
-// Simple GET endpoint that directly increments the view count
+let supabase: any; // Declare supabase client outside
+
+function initializeSupabase() {
+  if (supabase) return; // Already initialized
+
+  // Ensure environment variables are loaded
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('CRITICAL: Missing Supabase URL or Anon Key in API environment.')
+    // Cannot create client, requests will fail later
+    supabase = null;
+  } else {
+    supabase = createClient(supabaseUrl, supabaseAnonKey);
+    console.log("Supabase client initialized for ping-view.");
+  }
+}
+
+// Initialize Supabase client when the module loads
+initializeSupabase();
+
 export async function GET(request: Request) {
-  // Extract the ID from the URL parameters
+  // Check if Supabase client failed to initialize
+  if (!supabase) {
+    console.error('Supabase client not available in GET /api/ping-view');
+    return new Response(gifData, { headers: gifHeaders });
+  }
+
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
-  
+
   if (!id) {
-    // Return a 1x1 transparent GIF
-    return new Response(
-      Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64'), 
-      {
-        headers: {
-          'Content-Type': 'image/gif',
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      }
-    );
+    console.warn('ping-view called without ID');
+    return new Response(gifData, { headers: gifHeaders });
   }
-  
+
   try {
-    // Try to directly update the database
-    await supabase
-      .from('pet_uploads')
-      .update({ 
-        view_count: supabase.rpc('increment_pet_view_count_expression', { row_id: id }) 
-      })
-      .eq('id', id);
-    
-    // We don't care about the result, just that we tried
-    
-    // Return a 1x1 transparent GIF
-    return new Response(
-      Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64'), 
-      {
-        headers: {
-          'Content-Type': 'image/gif',
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      }
-    );
+    // Directly call the RPC function to increment the count
+    console.log(`Attempting to increment view count for pet ${id}`); // Add log
+    const { error } = await supabase.rpc('increment_pet_view_count_void', { 
+      pet_id_param: id 
+    });
+
+    if (error) {
+      // Log the error clearly
+      console.error(`DB Error incrementing view count for pet ${id}:`, error.message, error.details, error.hint);
+      // Still return the GIF to avoid breaking the image load
+      return new Response(gifData, { headers: gifHeaders });
+    }
+
+    // Log success 
+    console.log(`Successfully triggered view count increment for pet ${id}`);
+
+    // Return the 1x1 transparent GIF
+    return new Response(gifData, { headers: gifHeaders });
+
   } catch (error) {
-    console.error('Failed to update view count:', error);
-    
-    // Still return the 1x1 GIF even if there's an error
-    return new Response(
-      Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64'), 
-      {
-        headers: {
-          'Content-Type': 'image/gif',
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      }
-    );
+    // Catch any unexpected errors during the process
+    console.error(`Unexpected API error in ping-view for pet ${id}:`, error);
+    // Still return the GIF
+    return new Response(gifData, { headers: gifHeaders });
   }
 } 
