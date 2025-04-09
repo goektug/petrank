@@ -233,22 +233,28 @@ export default function Home() {
           onClick={() => setSelectedImage(null)}
         >
           <div 
-            className="bg-white rounded-lg max-w-4xl w-full overflow-hidden"
+            className="bg-white rounded-lg overflow-hidden max-w-4xl w-full max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="relative">
+            <div className="relative flex-1 flex items-center justify-center bg-gray-100 overflow-hidden">
               <img
                 src={selectedImage.image_url}
                 alt={selectedImage.pet_name}
-                className="w-full h-[500px] object-contain bg-black"
+                className="max-w-full max-h-[70vh] object-contain"
               />
               <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded">
                 👁 {selectedImage.view_count || 0} views
               </div>
+              <button
+                className="absolute top-4 left-4 bg-black bg-opacity-50 text-white w-8 h-8 rounded-full flex items-center justify-center hover:bg-opacity-75"
+                onClick={() => setSelectedImage(null)}
+              >
+                ✕
+              </button>
             </div>
-            <div className="p-6">
-              <h2 className="text-2xl font-bold mb-4">{selectedImage.pet_name}</h2>
-              <div className="space-y-2">
+            <div className="p-4 bg-white">
+              <h2 className="text-2xl font-bold mb-2">{selectedImage.pet_name}</h2>
+              <div className="space-y-1">
                 <p className="text-gray-700">Age: {selectedImage.age}</p>
                 <p className="text-gray-700">Gender: {selectedImage.gender}</p>
                 {selectedImage.social_media_link && (
@@ -264,12 +270,6 @@ export default function Home() {
                   </p>
                 )}
               </div>
-              <button
-                className="mt-4 bg-gray-200 px-4 py-2 rounded hover:bg-gray-300"
-                onClick={() => setSelectedImage(null)}
-              >
-                Close
-              </button>
             </div>
           </div>
         </div>
