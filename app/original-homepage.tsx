@@ -107,34 +107,12 @@ export default function Home() {
       prev && prev.id === pet.id ? { ...prev, view_count: newViewCount } : prev
     );
     
-    // Simple POST request - minimal options for maximum compatibility
-    try {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', '/api/increment-view', true);
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      
-      xhr.onreadystatechange = function() {
-        if (xhr.readyState === 4) {
-          console.log(`XHR status: ${xhr.status}, response: ${xhr.responseText}`);
-          
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              const response = JSON.parse(xhr.responseText);
-              console.log('View count updated successfully:', response);
-            } catch (e) {
-              console.error('Failed to parse response:', e);
-            }
-          } else {
-            console.error('Error updating view count:', xhr.statusText);
-          }
-        }
-      };
-      
-      xhr.send(JSON.stringify({ pet_id: pet.id }));
-    } catch (err) {
-      console.error('Failed to send view count update:', err);
-      // UI already updated optimistically, so we don't need to revert
-    }
+    // Use a simple image "ping" method that works on all browsers
+    // This approach has extremely high compatibility
+    const trackingPixel = new Image();
+    trackingPixel.onload = () => console.log('View count update successful');
+    trackingPixel.onerror = () => console.log('View count update error');
+    trackingPixel.src = `/api/ping-view?id=${encodeURIComponent(pet.id)}&t=${new Date().getTime()}`;
   };
 
   return (
