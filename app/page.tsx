@@ -512,51 +512,16 @@ function HomeContent() {
     }
   }
 
-  // Modified handleImageClick to directly call the API instead of using batcher
-  const handleImageClick = useCallback(async (pet: PetImage, index: number) => {
-    console.log('Image clicked:', pet.id, 'at index:', index)
+  // Modified handleImageClick - ONLY handles opening the modal now
+  const handleImageClick = useCallback((pet: PetImage, index: number) => {
+    console.log('Image clicked, opening modal for:', pet.id, 'at index:', index)
     setSelectedImage(pet)
     setSelectedImageIndex(index)
     
-    try {
-      // Optimistically update the UI right away
-      setPetImages(images => 
-        images.map(p => 
-          p.id === pet.id ? { ...p, view_count: (p.view_count || 0) + 1 } : p
-        )
-      )
-      
-      // Directly call the API endpoint to increment view count
-      const response = await fetch('/api/increment-view', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ pet_id: pet.id }),
-      });
-      
-      if (!response.ok) {
-        console.error('Failed to increment view count:', await response.text());
-        return;
-      }
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        console.log(`View count updated successfully to ${result.view_count}`);
-        // Update with the actual count returned from the server
-        if (result.view_count !== undefined) {
-          setPetImages(images => 
-            images.map(p => 
-              p.id === pet.id ? { ...p, view_count: result.view_count } : p
-            )
-          )
-        }
-      }
-    } catch (error) {
-      console.error('Error updating view count:', error);
-    }
-  }, [])
+    // View count is now handled SOLELY by the tracking pixel (/api/ping-view)
+    // NO API call or optimistic update here anymore
+
+  }, []) // Removed dependencies related to view count update
 
   // Modified touch event handler for mobile devices
   const handleTouchStart = (e: React.TouchEvent, pet: PetImage) => {
