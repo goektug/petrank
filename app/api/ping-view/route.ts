@@ -36,6 +36,7 @@ export async function GET(request: Request) {
   // Check if Supabase client failed to initialize
   if (!supabase) {
     console.error('Supabase client not available in GET /api/ping-view');
+    // Return the GIF as a proper Response, not trying to return JSON since this is a ping endpoint
     return new Response(gifData, { headers: gifHeaders });
   }
 
@@ -44,6 +45,7 @@ export async function GET(request: Request) {
 
   if (!id) {
     console.warn('ping-view called without ID');
+    // Return the GIF as a proper Response, not trying to return JSON
     return new Response(gifData, { headers: gifHeaders });
   }
 
