@@ -159,22 +159,33 @@ export default function UploadModal({ onClose, file, onSuccess }: UploadModalPro
 
       if (!response.ok) {
         let errorMessage = 'Failed to upload pet';
-        try {
-          const errorData = await response.json();
-          if (errorData.error) {
-            errorMessage = errorData.error;
+        
+        // Check the content type before trying to parse as JSON
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            // Clone the response before parsing to avoid consuming the body
+            const errorData = await response.clone().json();
+            if (errorData.error) {
+              errorMessage = errorData.error;
+            }
+          } catch (jsonError) {
+            // If JSON parsing fails, use status text or a default message
+            errorMessage = response.statusText || 'Error processing response from server';
+            console.error('JSON parsing error:', jsonError);
           }
-        } catch (jsonError) {
-          // If JSON parsing fails, use status text or a default message
-          errorMessage = response.statusText || 'Error processing response from server';
-          console.error('JSON parsing error:', jsonError);
+        } else {
+          // Not JSON, so use text if possible or status
+          errorMessage = `Server error: ${response.status} ${response.statusText}`;
         }
+        
         throw new Error(errorMessage);
       }
 
       let result;
       try {
-        result = await response.json();
+        // Clone the response before parsing to avoid consuming the body
+        result = await response.clone().json();
       } catch (jsonError) {
         console.error('Error parsing response:', jsonError);
         setError('Server returned an invalid response. Please try again.');
