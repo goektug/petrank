@@ -200,6 +200,8 @@ export default function UploadModal({ onClose, file, onSuccess }: UploadModalPro
       }
 
       const petId = result.data?.[0]?.id || id;
+      console.log("Redirecting to pet page with ID:", petId);
+      console.log("Full API response data:", result.data);
       router.push(`/p/${petId}`);
       
       setSuccess(true);
