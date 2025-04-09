@@ -227,39 +227,30 @@ export default function Home() {
         )
       )}
 
-      {/* Image Preview Modal - Image Overlapping Info Box */}
+      {/* Image Preview Modal - Black background removed from image container */}
       {selectedImage && (
         <div 
-          // Removed dark overlay: Kept positioning, removed bg-black/opacity
-          // Added pointer-events-none so clicks go through unless hitting content
-          className="fixed inset-0 flex flex-col items-center justify-center p-4 z-50 pointer-events-none"
-          onClick={() => setSelectedImage(null)} // Click on empty area closes
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50"
+          onClick={() => setSelectedImage(null)}
         >
-          {/* Main container for modal content (image + box) */}
-          {/* Relative positioning, pointer-events-auto, max width/height */}
           <div 
-            className="relative flex flex-col items-center pointer-events-auto max-w-lg w-full"
-            onClick={(e) => e.stopPropagation()} // Prevent clicks inside closing modal
+            className="bg-white rounded-lg max-w-4xl w-full overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
           >
-            {/* Image: Positioned above the info box, overlapping */}
-            {/* Rounded corners, shadow, size constraints */}
-            <div className="relative mb-[-40px] z-10"> {/* Negative margin pulls info box up */} 
+            <div className="relative">
               <img
                 src={selectedImage.image_url}
                 alt={selectedImage.pet_name}
-                className="block object-contain max-w-full max-h-[60vh] rounded-lg shadow-lg"
+                // Changed from 'bg-black' to no background (white by default)
+                className="w-full h-[500px] object-contain" 
               />
-              {/* View count overlay on image */}
-              <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-white text-sm px-2 py-1 rounded">
+              <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded">
                 👁 {selectedImage.view_count || 0} views
               </div>
             </div>
-
-            {/* White Info Box: Below the image */}
-            {/* Padding starts higher due to image overlap */}
-            <div className="bg-white rounded-lg p-4 pt-12 w-full shadow-lg"> {/* pt-12 gives space for overlapping image */} 
-              <h2 className="text-xl font-bold mb-2 text-center">{selectedImage.pet_name}</h2>
-              <div className="text-sm space-y-1">
+            <div className="p-6">
+              <h2 className="text-2xl font-bold mb-4">{selectedImage.pet_name}</h2>
+              <div className="space-y-2">
                 <p className="text-gray-700">Age: {selectedImage.age}</p>
                 <p className="text-gray-700">Gender: {selectedImage.gender}</p>
                 {selectedImage.social_media_link && (
@@ -268,7 +259,7 @@ export default function Home() {
                       href={selectedImage.social_media_link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
+                      className="text-blue-500 hover:text-blue-700"
                     >
                       Visit Social Media
                     </a>
@@ -276,7 +267,7 @@ export default function Home() {
                 )}
               </div>
               <button
-                className="mt-4 w-full bg-gray-200 px-4 py-2 rounded text-sm font-medium hover:bg-gray-300"
+                className="mt-4 bg-gray-200 px-4 py-2 rounded hover:bg-gray-300"
                 onClick={() => setSelectedImage(null)}
               >
                 Close
