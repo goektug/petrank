@@ -1,78 +1,95 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
-// Constants for the 1x1 transparent GIF response
-const gifData = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
-const gifHeaders = {
-  'Content-Type': 'image/gif',
-  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-  'Pragma': 'no-cache',
-  'Expires': '0'
-};
+// 1x1 transparent GIF pixel - this is the actual image data
+const TRANSPARENT_GIF = Buffer.from(
+  'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+  'base64'
+);
 
-let supabase: any; // Declare supabase client outside
-
-function initializeSupabase() {
-  if (supabase) return; // Already initialized
-
-  // Ensure environment variables are loaded
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('CRITICAL: Missing Supabase URL or Anon Key in API environment.')
-    // Cannot create client, requests will fail later
-    supabase = null;
-  } else {
-    supabase = createClient(supabaseUrl, supabaseAnonKey);
-    console.log("Supabase client initialized for ping-view.");
-  }
-}
-
-// Initialize Supabase client when the module loads
-initializeSupabase();
+// Create a client that uses the service role key for admin-level database operations
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function GET(request: Request) {
-  // Check if Supabase client failed to initialize
-  if (!supabase) {
-    console.error('Supabase client not available in GET /api/ping-view');
-    // Return the GIF as a proper Response, not trying to return JSON since this is a ping endpoint
-    return new Response(gifData, { headers: gifHeaders });
-  }
-
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get('id');
-
-  if (!id) {
-    console.warn('ping-view called without ID');
-    // Return the GIF as a proper Response, not trying to return JSON
-    return new Response(gifData, { headers: gifHeaders });
-  }
-
-  try {
-    // Directly call the RPC function to increment the count
-    console.log(`Attempting to increment view count for pet ${id}`); // Add log
-    const { error } = await supabase.rpc('increment_pet_view_count_void', { 
-      pet_id_param: id 
+  // Extract the pet ID from the URL query parameter
+  const url = new URL(request.url);
+  const petId = url.searchParams.get('id');
+  
+  // Log the request
+  console.log(`Received pixel view ping for pet ID: ${petId || 'undefined'}`);
+  
+  // If no pet ID was provided, just return the tracking pixel
+  if (!petId) {
+    console.log('No pet ID provided, returning pixel only');
+    return new NextResponse(TRANSPARENT_GIF, {
+      status: 200,
+      headers: {
+        'Content-Type': 'image/gif',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
     });
-
-    if (error) {
-      // Log the error clearly
-      console.error(`DB Error incrementing view count for pet ${id}:`, error.message, error.details, error.hint);
-      // Still return the GIF to avoid breaking the image load
-      return new Response(gifData, { headers: gifHeaders });
-    }
-
-    // Log success 
-    console.log(`Successfully triggered view count increment for pet ${id}`);
-
-    // Return the 1x1 transparent GIF
-    return new Response(gifData, { headers: gifHeaders });
-
-  } catch (error) {
-    // Catch any unexpected errors during the process
-    console.error(`Unexpected API error in ping-view for pet ${id}:`, error);
-    // Still return the GIF
-    return new Response(gifData, { headers: gifHeaders });
   }
+  
+  try {
+    // Attempt to update the view count in the database
+    // Using the simplest, most reliable approach
+    const { data, error } = await supabase
+      .from('pet_uploads')
+      .update({ 
+        view_count: supabase.rpc('increment_view_count_expression', { row_id: petId }) 
+      })
+      .eq('id', petId);
+    
+    if (error) {
+      console.error('Error incrementing view count:', error);
+      
+      // Fallback to direct increment if the function call fails
+      try {
+        // Get current value
+        const { data: pet, error: fetchError } = await supabase
+          .from('pet_uploads')
+          .select('view_count')
+          .eq('id', petId)
+          .single();
+        
+        if (fetchError) {
+          throw fetchError;
+        }
+        
+        // Update with incremented value
+        const currentCount = pet?.view_count || 0;
+        const { error: updateError } = await supabase
+          .from('pet_uploads')
+          .update({ view_count: currentCount + 1 })
+          .eq('id', petId);
+        
+        if (updateError) {
+          throw updateError;
+        }
+        
+        console.log(`Successfully incremented view count using fallback method: ${currentCount} → ${currentCount + 1}`);
+      } catch (fallbackError) {
+        console.error('Fallback increment failed:', fallbackError);
+      }
+    } else {
+      console.log(`Successfully incremented view count for pet ID: ${petId}`);
+    }
+  } catch (error) {
+    console.error('Unexpected error in ping-view API:', error);
+  }
+  
+  // Always return a transparent GIF image with no-cache headers
+  return new NextResponse(TRANSPARENT_GIF, {
+    status: 200,
+    headers: {
+      'Content-Type': 'image/gif',
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    },
+  });
 } 

@@ -512,47 +512,50 @@ function HomeContent() {
     }
   }
 
-  // Update view counts with batching system
-  useEffect(() => {
-    // Start the view count batcher with 1-minute interval
-    viewCountBatcher.startBatching(60 * 1000)
-    
-    // Set up a listener to update UI when counts change
-    const removeListener = viewCountBatcher.addListener((petId, newCount) => {
-      setPetImages(images => 
-        images.map(p => 
-          p.id === petId ? { ...p, view_count: newCount } : p
-        )
-      )
-      
-      // Also update selected image if it's the one being updated
-      setSelectedImage(prev => 
-        prev && prev.id === petId ? { ...prev, view_count: newCount } : prev
-      )
-    })
-    
-    // Clean up on unmount
-    return () => {
-      viewCountBatcher.stopBatching()
-      removeListener()
-    }
-  }, [])
-
-  // Modified handleImageClick to use the batcher
-  const handleImageClick = useCallback((pet: PetImage, index: number) => {
+  // Modified handleImageClick to directly call the API instead of using batcher
+  const handleImageClick = useCallback(async (pet: PetImage, index: number) => {
     console.log('Image clicked:', pet.id, 'at index:', index)
     setSelectedImage(pet)
     setSelectedImageIndex(index)
     
-    // Add to view count batch instead of immediately updating DB
-    viewCountBatcher.incrementViewCount(pet.id)
-    
-    // Optimistically update the UI right away
-    setPetImages(images => 
-      images.map(p => 
-        p.id === pet.id ? { ...p, view_count: (p.view_count || 0) + 1 } : p
+    try {
+      // Optimistically update the UI right away
+      setPetImages(images => 
+        images.map(p => 
+          p.id === pet.id ? { ...p, view_count: (p.view_count || 0) + 1 } : p
+        )
       )
-    )
+      
+      // Directly call the API endpoint to increment view count
+      const response = await fetch('/api/increment-view', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ pet_id: pet.id }),
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to increment view count:', await response.text());
+        return;
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log(`View count updated successfully to ${result.view_count}`);
+        // Update with the actual count returned from the server
+        if (result.view_count !== undefined) {
+          setPetImages(images => 
+            images.map(p => 
+              p.id === pet.id ? { ...p, view_count: result.view_count } : p
+            )
+          )
+        }
+      }
+    } catch (error) {
+      console.error('Error updating view count:', error);
+    }
   }, [])
 
   // Modified touch event handler for mobile devices
@@ -700,6 +703,14 @@ function HomeContent() {
                       }
                     }}
                   />
+                  {/* Add tracking pixel for Android compatibility */}
+                  <img 
+                    src={`/api/ping-view?id=${petImages[0].id}&t=${Date.now()}`} 
+                    alt="" 
+                    width="1" 
+                    height="1" 
+                    style={{ position: 'absolute', bottom: 0, right: 0, opacity: 0.01 }} 
+                  />
                 </div>
                 <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-2 text-lg rounded-full">
                   👁 {petImages[0].view_count || 0}
@@ -764,6 +775,14 @@ function HomeContent() {
                               }
                             }
                           }}
+                        />
+                        {/* Add tracking pixel for Android compatibility */}
+                        <img 
+                          src={`/api/ping-view?id=${pet.id}&t=${Date.now()}`} 
+                          alt="" 
+                          width="1" 
+                          height="1" 
+                          style={{ position: 'absolute', bottom: 0, right: 0, opacity: 0.01 }} 
                         />
                       </div>
                       <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 text-sm rounded-full">
@@ -869,6 +888,16 @@ function HomeContent() {
                           }
                         }
                       }}
+                    />
+                  )}
+                  {/* Add tracking pixel for modal view */}
+                  {selectedImage.id && (
+                    <img 
+                      src={`/api/ping-view?id=${selectedImage.id}&t=${Date.now()}&modal=1`} 
+                      alt="" 
+                      width="1" 
+                      height="1" 
+                      style={{ position: 'absolute', bottom: 0, right: 0, opacity: 0.01 }} 
                     />
                   )}
                 </div>

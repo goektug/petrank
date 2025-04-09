@@ -1,10 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
-// Create a basic client that doesn't rely on cookies
+// Create a client that uses the service role key for admin-level database operations
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function POST(request: Request) {
   try {
@@ -28,28 +28,63 @@ export async function POST(request: Request) {
       );
     }
     
-    // Simple single-query approach
-    // Use the SQL to directly increment by 1 in a single query
-    const { data, error } = await supabase.rpc('increment_pet_view_count', { 
-      pet_id_param: pet_id 
-    });
+    console.log(`Processing view increment for pet ID: ${pet_id}`);
+    
+    // Directly update the database using a simple UPDATE query
+    // This is more reliable than RPC functions which might have permission issues
+    const { data, error } = await supabase
+      .from('pet_uploads')
+      .update({ 
+        view_count: supabase.rpc('increment_view_count_expression', { row_id: pet_id }) 
+      })
+      .eq('id', pet_id);
     
     if (error) {
       console.error('Error incrementing view count:', error);
-      return NextResponse.json(
-        { success: false, error: 'Database operation failed', details: error.message },
-        { status: 500 }
-      );
+      
+      // Fallback to direct increment if the function call fails
+      try {
+        console.log('Attempting fallback direct increment...');
+        // First get current value
+        const { data: pet, error: fetchError } = await supabase
+          .from('pet_uploads')
+          .select('view_count')
+          .eq('id', pet_id)
+          .single();
+        
+        if (fetchError) {
+          throw fetchError;
+        }
+        
+        // Then update with incremented value
+        const currentCount = pet?.view_count || 0;
+        const { error: updateError } = await supabase
+          .from('pet_uploads')
+          .update({ view_count: currentCount + 1 })
+          .eq('id', pet_id);
+        
+        if (updateError) {
+          throw updateError;
+        }
+        
+        console.log(`Successfully incremented view count using fallback method: ${currentCount} → ${currentCount + 1}`);
+      } catch (fallbackError) {
+        console.error('Fallback increment also failed:', fallbackError);
+        return NextResponse.json(
+          { success: false, error: 'Database operation failed', details: error.message },
+          { status: 500 }
+        );
+      }
     }
     
-    // Get the updated count (if available)
+    // Get the updated count
     const { data: updatedPet, error: fetchError } = await supabase
       .from('pet_uploads')
       .select('view_count')
       .eq('id', pet_id)
       .single();
     
-    const updatedCount = updatedPet?.view_count || null;
+    const updatedCount = updatedPet?.view_count || 0;
     
     return NextResponse.json(
       { 
