@@ -1,5 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 
 export async function POST(request: Request) {
   const body = await request.json()
@@ -9,33 +10,41 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Missing pet_id parameter' }, { status: 400 })
   }
   
-  // Create a service role client that bypasses RLS
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    }
-  )
+  // Create a regular Supabase client (no service role)
+  const supabase = createRouteHandlerClient({ cookies })
   
   try {
-    // Update view count using admin client
-    const { data, error } = await supabaseAdmin
+    // Get the current view count
+    const { data: currentData, error: fetchError } = await supabase
       .from('pet_uploads')
-      .update({ 
-        view_count: supabaseAdmin.rpc('increment_view_count_expression', { row_id: pet_id })
-      })
+      .select('view_count')
+      .eq('id', pet_id)
+      .single()
+    
+    if (fetchError) {
+      console.error('Error fetching current view count:', fetchError)
+      throw fetchError
+    }
+    
+    // Calculate the new view count
+    const currentCount = currentData?.view_count || 0
+    const newCount = currentCount + 1
+    
+    // Directly update with the new count
+    const { data, error } = await supabase
+      .from('pet_uploads')
+      .update({ view_count: newCount })
       .eq('id', pet_id)
       .select('view_count')
     
-    if (error) throw error
+    if (error) {
+      console.error('Error updating view count:', error)
+      throw error
+    }
     
     return NextResponse.json({ 
       success: true, 
-      view_count: data && data[0] ? data[0].view_count : null 
+      view_count: data && data[0] ? data[0].view_count : newCount 
     }, { status: 200 })
   } catch (error) {
     console.error('Error incrementing view count:', error)

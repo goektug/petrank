@@ -90,9 +90,21 @@ export default function Home() {
   }
 
   const handleImageClick = (pet: PetImage) => {
-    setSelectedImage(pet)
+    setSelectedImage(pet);
+    console.log(`Incrementing view count for pet: ${pet.id}`);
     
-    // Update view count using the API endpoint
+    // First update UI immediately to improve perceived performance
+    const newViewCount = (pet.view_count || 0) + 1;
+    setPetImages(images => 
+      images.map(p => 
+        p.id === pet.id ? { ...p, view_count: newViewCount } : p
+      )
+    );
+    setSelectedImage(prev => 
+      prev ? { ...prev, view_count: newViewCount } : null
+    );
+    
+    // Then send the update to the server
     fetch('/api/increment-view', {
       method: 'POST',
       headers: {
@@ -101,26 +113,45 @@ export default function Home() {
       body: JSON.stringify({ pet_id: pet.id })
     })
     .then(async (response) => {
-      if (response.ok) {
-        const data = await response.json()
+      console.log(`View count API response status: ${response.status}`);
+      const responseText = await response.text();
+      console.log(`View count API response body: ${responseText}`);
+      
+      // Try to parse the response as JSON if possible
+      try {
+        // Define an interface for the expected response format
+        interface ViewCountResponse {
+          success: boolean;
+          view_count: number;
+          error?: string;
+        }
         
-        // Update local state with new view count
-        setPetImages(images => 
-          images.map(p => 
-            p.id === pet.id ? { ...p, view_count: data.view_count || (p.view_count || 0) + 1 } : p
-          )
-        )
-        setSelectedImage(prev => 
-          prev ? { ...prev, view_count: data.view_count || (prev.view_count || 0) + 1 } : null
-        )
-      } else {
-        console.error('Error updating view count')
+        const data = JSON.parse(responseText) as ViewCountResponse;
+        
+        if (response.ok && data.view_count) {
+          console.log(`Server confirmed view count: ${data.view_count}`);
+          // Update with the server's view count if it differs from our optimistic update
+          if (data.view_count !== newViewCount) {
+            setPetImages(images => 
+              images.map(p => 
+                p.id === pet.id ? { ...p, view_count: data.view_count } : p
+              )
+            );
+            setSelectedImage(prev => 
+              prev ? { ...prev, view_count: data.view_count } : null
+            );
+          }
+        } else {
+          console.error('Error updating view count:', data.error || 'Unknown error');
+        }
+      } catch (parseError) {
+        console.error('Error parsing response:', responseText, parseError);
       }
     })
     .catch((err: Error) => {
-      console.error('Error updating view count:', err)
-    })
-  }
+      console.error('Network error updating view count:', err);
+    });
+  };
 
   return (
     <main className="container mx-auto px-4 py-8">
