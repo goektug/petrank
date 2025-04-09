@@ -39,72 +39,60 @@ export async function POST(request: Request) {
     
     console.log(`Processing view increment for pet ID: ${pet_id}`);
     
-    // Directly update the database using a simple UPDATE query
-    // This is more reliable than RPC functions which might have permission issues
-    const { data, error } = await supabase
-      .from('pet_uploads')
-      .update({ 
-        view_count: supabase.rpc('increment_view_count_expression', { row_id: pet_id }) 
-      })
-      .eq('id', pet_id);
-    
-    if (error) {
-      console.error('Error incrementing view count:', error);
+    // Simplest approach: Get current value then increment
+    try {
+      // First get current value
+      const { data: pet, error: fetchError } = await supabase
+        .from('pet_uploads')
+        .select('view_count')
+        .eq('id', pet_id)
+        .single();
       
-      // Fallback to direct increment if the function call fails
-      try {
-        console.log('Attempting fallback direct increment...');
-        // First get current value
-        const { data: pet, error: fetchError } = await supabase
-          .from('pet_uploads')
-          .select('view_count')
-          .eq('id', pet_id)
-          .single();
-        
-        if (fetchError) {
-          throw fetchError;
-        }
-        
-        // Then update with incremented value
-        const currentCount = pet?.view_count || 0;
-        const { error: updateError } = await supabase
-          .from('pet_uploads')
-          .update({ view_count: currentCount + 1 })
-          .eq('id', pet_id);
-        
-        if (updateError) {
-          throw updateError;
-        }
-        
-        console.log(`Successfully incremented view count using fallback method: ${currentCount} → ${currentCount + 1}`);
-      } catch (fallbackError) {
-        console.error('Fallback increment also failed:', fallbackError);
+      if (fetchError) {
+        // If the pet doesn't exist, we can't increment, log and return error
+        console.error(`Error fetching pet ${pet_id} for view count update:`, fetchError);
         return NextResponse.json(
-          { success: false, error: 'Database operation failed', details: error.message },
-          { status: 500 }
+          { success: false, error: 'Pet not found or database error fetching count', details: String(fetchError) },
+          { status: 404 } // Use 404 if pet not found is likely
         );
       }
+      
+      // Then update with incremented value
+      const currentCount = pet?.view_count || 0;
+      const newCount = currentCount + 1;
+      
+      const { error: updateError } = await supabase
+        .from('pet_uploads')
+        .update({ view_count: newCount })
+        .eq('id', pet_id);
+      
+      if (updateError) {
+        // Log the specific update error
+        console.error(`Error updating view count for pet ${pet_id}:`, updateError);
+        throw updateError; // Let the outer catch handle the response
+      }
+      
+      console.log(`Successfully incremented view count for pet ${pet_id}: ${currentCount} → ${newCount}`);
+      
+      return NextResponse.json(
+        { 
+          success: true, 
+          view_count: newCount,
+          message: 'View count updated successfully'
+        },
+        { status: 200 }
+      );
+    } catch (error) {
+      // This catches errors from fetchError or updateError being thrown
+      console.error('Error during view count update database operation:', error);
+      return NextResponse.json(
+        { success: false, error: 'Database operation failed', details: String(error) },
+        { status: 500 }
+      );
     }
-    
-    // Get the updated count
-    const { data: updatedPet, error: fetchError } = await supabase
-      .from('pet_uploads')
-      .select('view_count')
-      .eq('id', pet_id)
-      .single();
-    
-    const updatedCount = updatedPet?.view_count || 0;
-    
-    return NextResponse.json(
-      { 
-        success: true, 
-        view_count: updatedCount,
-        message: 'View count updated successfully'
-      },
-      { status: 200 }
-    );
   } catch (error) {
-    console.error('Unexpected error in increment-view API:', error);
+    // This catches errors like JSON parsing or unexpected issues
+    console.error('Unexpected error in increment-view API handler:', error);
     return NextResponse.json(
       { success: false, error: 'Server error', details: String(error) },
       { status: 500 }

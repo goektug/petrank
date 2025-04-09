@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   
   // If no pet ID was provided, just return the tracking pixel
   if (!petId) {
-    console.log('No pet ID provided, returning pixel only');
+    console.warn('No pet ID provided in ping-view, returning pixel only');
     return new NextResponse(TRANSPARENT_GIF, {
       status: 200,
       headers: {
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
     
     if (!supabaseUrl || !supabaseServiceKey) {
-      console.error('Missing Supabase URL or service key');
+      console.error('Missing Supabase URL or service key in ping-view');
       // Still return the pixel even if we can't update the count
       return new NextResponse(TRANSPARENT_GIF, {
         status: 200,
@@ -50,51 +50,45 @@ export async function GET(request: Request) {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    // Attempt to update the view count in the database
-    // Using the simplest, most reliable approach
-    const { data, error } = await supabase
-      .from('pet_uploads')
-      .update({ 
-        view_count: supabase.rpc('increment_view_count_expression', { row_id: petId }) 
-      })
-      .eq('id', petId);
-    
-    if (error) {
-      console.error('Error incrementing view count:', error);
+    // Simplest approach: Get current value then increment
+    try {
+      // First get current value
+      const { data: pet, error: fetchError } = await supabase
+        .from('pet_uploads')
+        .select('view_count')
+        .eq('id', petId)
+        .single();
       
-      // Fallback to direct increment if the function call fails
-      try {
-        // Get current value
-        const { data: pet, error: fetchError } = await supabase
-          .from('pet_uploads')
-          .select('view_count')
-          .eq('id', petId)
-          .single();
-        
-        if (fetchError) {
-          throw fetchError;
-        }
-        
-        // Update with incremented value
+      if (fetchError) {
+        // Log the error but don't throw, as we still need to return the pixel
+        console.error(`Error fetching pet ${petId} for view count update (ping):`, fetchError);
+        // Don't proceed with update if pet not found or error fetching
+      } else {
+        // Then update with incremented value
         const currentCount = pet?.view_count || 0;
+        const newCount = currentCount + 1;
+        
         const { error: updateError } = await supabase
           .from('pet_uploads')
-          .update({ view_count: currentCount + 1 })
+          .update({ view_count: newCount })
           .eq('id', petId);
         
         if (updateError) {
-          throw updateError;
+          // Log the error but don't throw
+          console.error(`Error updating view count for pet ${petId} (ping):`, updateError);
+        } else {
+          console.log(`Successfully incremented view count via ping for pet ${petId}: ${currentCount} → ${newCount}`);
         }
-        
-        console.log(`Successfully incremented view count using fallback method: ${currentCount} → ${currentCount + 1}`);
-      } catch (fallbackError) {
-        console.error('Fallback increment failed:', fallbackError);
       }
-    } else {
-      console.log(`Successfully incremented view count for pet ID: ${petId}`);
+    } catch (error) {
+      // Catch any unexpected error during the DB operation
+      console.error('Unexpected error during view count update in ping-view:', error);
+      // Don't throw, just log and proceed to return the pixel
     }
   } catch (error) {
-    console.error('Unexpected error in ping-view API:', error);
+    // Catch errors like URL parsing
+    console.error('Unexpected error in ping-view API handler:', error);
+    // Don't throw, just log and proceed to return the pixel
   }
   
   // Always return a transparent GIF image with no-cache headers
