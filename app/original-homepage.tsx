@@ -227,30 +227,34 @@ export default function Home() {
         )
       )}
 
-      {/* Image Preview Modal - Reverted to original structure */}
+      {/* Image Preview Modal - Attempting tight fit */}
       {selectedImage && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50"
           onClick={() => setSelectedImage(null)}
         >
+          {/* Use inline-block to allow the container to shrink to content size, up to max-w */}
           <div 
-            className="bg-white rounded-lg max-w-4xl w-full overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-lg overflow-hidden inline-block align-middle max-w-4xl max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()} // Prevent clicks inside from closing modal
           >
+            {/* Image container */}
             <div className="relative">
-              {/* Original image styling before max-height attempts */}
               <img
                 src={selectedImage.image_url}
                 alt={selectedImage.pet_name}
-                className="w-full h-[500px] object-contain bg-black" // Reverted to fixed height and black bg
+                // Let image dictate size, constrained by viewport height and container width
+                className="block object-contain max-w-full max-h-[80vh]" 
               />
-              <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded">
+              {/* View count overlay */}
+              <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-white text-sm px-2 py-1 rounded">
                 👁 {selectedImage.view_count || 0} views
               </div>
             </div>
-            <div className="p-6">
-              <h2 className="text-2xl font-bold mb-4">{selectedImage.pet_name}</h2>
-              <div className="space-y-2">
+            {/* Details section below image */}
+            <div className="p-4">
+              <h2 className="text-xl font-bold mb-2">{selectedImage.pet_name}</h2>
+              <div className="text-sm space-y-1">
                 <p className="text-gray-700">Age: {selectedImage.age}</p>
                 <p className="text-gray-700">Gender: {selectedImage.gender}</p>
                 {selectedImage.social_media_link && (
@@ -259,15 +263,16 @@ export default function Home() {
                       href={selectedImage.social_media_link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-500 hover:text-blue-700"
+                      className="text-blue-600 hover:underline"
                     >
                       Visit Social Media
                     </a>
                   </p>
                 )}
               </div>
+              {/* Close button remains accessible */}
               <button
-                className="mt-4 bg-gray-200 px-4 py-2 rounded hover:bg-gray-300"
+                className="mt-3 w-full bg-gray-200 px-4 py-2 rounded text-sm font-medium hover:bg-gray-300"
                 onClick={() => setSelectedImage(null)}
               >
                 Close
